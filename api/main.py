@@ -33,7 +33,13 @@ from api.routers import (
     transformations,
 )
 from api.routers import commands as commands_router
-from open_notebook.database.sqlite_migrate import SQLiteMigrationManager
+from open_notebook.database import is_sqlite
+
+# Import the appropriate migration manager based on backend
+if is_sqlite():
+    from open_notebook.database.sqlite_migrate import SQLiteMigrationManager
+else:
+    from open_notebook.database.async_migrate import AsyncMigrationManager
 
 # Import commands to register them in the API process
 try:
@@ -49,10 +55,15 @@ async def lifespan(app: FastAPI):
     Runs database migrations automatically on startup.
     """
     # Startup: Run database migrations
-    logger.info("Starting API initialization...")
+    backend_name = "SQLite" if is_sqlite() else "SurrealDB"
+    logger.info(f"Starting API initialization with {backend_name} backend...")
 
     try:
-        migration_manager = SQLiteMigrationManager()
+        # Use the appropriate migration manager based on backend
+        if is_sqlite():
+            migration_manager = SQLiteMigrationManager()
+        else:
+            migration_manager = AsyncMigrationManager()
         current_version = await migration_manager.get_current_version()
         logger.info(f"Current database version: {current_version}")
 

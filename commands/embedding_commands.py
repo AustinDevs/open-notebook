@@ -6,7 +6,9 @@ from pydantic import BaseModel
 from surreal_commands import CommandInput, CommandOutput, command, submit_command
 
 from open_notebook.ai.models import model_manager
-from open_notebook.database.sqlite_repository import (
+from open_notebook.database import (
+    ensure_record_id,
+    is_sqlite,
     repo_insert,
     repo_query,
     serialize_embedding,
@@ -146,15 +148,25 @@ async def embed_note_command(input_data: EmbedNoteInput) -> EmbedNoteOutput:
         )
 
         # 3. UPSERT embedding into note record
-        note_id = (
-            int(input_data.note_id.split(":")[1])
-            if ":" in input_data.note_id
-            else int(input_data.note_id)
-        )
-        await repo_query(
-            "UPDATE note SET embedding = ? WHERE id = ?",
-            (serialize_embedding(embedding), note_id),
-        )
+        if is_sqlite():
+            note_id = (
+                int(input_data.note_id.split(":")[1])
+                if ":" in input_data.note_id
+                else int(input_data.note_id)
+            )
+            await repo_query(
+                "UPDATE note SET embedding = ? WHERE id = ?",
+                (serialize_embedding(embedding), note_id),
+            )
+        else:
+            # SurrealDB: Update note with embedding
+            await repo_query(
+                "UPDATE $id SET embedding = $embedding",
+                {
+                    "id": ensure_record_id(input_data.note_id),
+                    "embedding": embedding,  # SurrealDB stores arrays natively
+                },
+            )
 
         processing_time = time.time() - start_time
         logger.info(
@@ -241,15 +253,25 @@ async def embed_insight_command(input_data: EmbedInsightInput) -> EmbedInsightOu
         )
 
         # 3. UPSERT embedding into insight record
-        insight_id = (
-            int(input_data.insight_id.split(":")[1])
-            if ":" in input_data.insight_id
-            else int(input_data.insight_id)
-        )
-        await repo_query(
-            "UPDATE source_insight SET embedding = ? WHERE id = ?",
-            (serialize_embedding(embedding), insight_id),
-        )
+        if is_sqlite():
+            insight_id = (
+                int(input_data.insight_id.split(":")[1])
+                if ":" in input_data.insight_id
+                else int(input_data.insight_id)
+            )
+            await repo_query(
+                "UPDATE source_insight SET embedding = ? WHERE id = ?",
+                (serialize_embedding(embedding), insight_id),
+            )
+        else:
+            # SurrealDB: Update insight with embedding
+            await repo_query(
+                "UPDATE $id SET embedding = $embedding",
+                {
+                    "id": ensure_record_id(input_data.insight_id),
+                    "embedding": embedding,  # SurrealDB stores arrays natively
+                },
+            )
 
         processing_time = time.time() - start_time
         logger.info(
@@ -331,16 +353,23 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
             raise ValueError(f"Source '{input_data.source_id}' has no text to embed")
 
         # 2. DELETE existing embeddings (idempotency)
-        source_id_int = (
-            int(input_data.source_id.split(":")[1])
-            if ":" in input_data.source_id
-            else int(input_data.source_id)
-        )
         logger.debug(f"Deleting existing embeddings for source {input_data.source_id}")
-        await repo_query(
-            "DELETE FROM source_embedding WHERE source_id = ?",
-            (source_id_int,),
-        )
+        if is_sqlite():
+            source_id_int = (
+                int(input_data.source_id.split(":")[1])
+                if ":" in input_data.source_id
+                else int(input_data.source_id)
+            )
+            await repo_query(
+                "DELETE FROM source_embedding WHERE source_id = ?",
+                (source_id_int,),
+            )
+        else:
+            # SurrealDB: Delete by source reference
+            await repo_query(
+                "DELETE source_embedding WHERE source = $source_id",
+                {"source_id": ensure_record_id(input_data.source_id)},
+            )
 
         # 3. Detect content type from file path if available
         file_path = source.asset.file_path if source.asset else None
@@ -375,15 +404,33 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
             )
 
         # 6. Bulk INSERT source_embedding records
-        records = [
-            {
-                "source_id": source_id_int,
-                "chunk_order": idx,
-                "content": chunk,
-                "embedding": embedding,
-            }
-            for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
-        ]
+        if is_sqlite():
+            source_id_int = (
+                int(input_data.source_id.split(":")[1])
+                if ":" in input_data.source_id
+                else int(input_data.source_id)
+            )
+            records = [
+                {
+                    "source_id": source_id_int,
+                    "chunk_order": idx,
+                    "content": chunk,
+                    "embedding": embedding,
+                }
+                for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+            ]
+        else:
+            # SurrealDB: Use source reference (RecordID)
+            source_record_id = ensure_record_id(input_data.source_id)
+            records = [
+                {
+                    "source": source_record_id,
+                    "chunk_order": idx,
+                    "content": chunk,
+                    "embedding": embedding,
+                }
+                for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+            ]
 
         logger.debug(f"Inserting {len(records)} source_embedding records")
         await repo_insert("source_embedding", records)
@@ -441,25 +488,39 @@ async def collect_items_for_rebuild(
 
     if include_sources:
         if mode == "existing":
-            # Query sources with embeddings (via source_embedding table)
-            result = await repo_query(
-                """
-                SELECT DISTINCT source_id as id FROM source_embedding
-                WHERE embedding IS NOT NULL
-                """
-            )
-            if result:
-                items["sources"] = [f"source:{item['id']}" for item in result]
+            if is_sqlite():
+                # SQLite: Query sources with embeddings (via source_embedding table)
+                result = await repo_query(
+                    """
+                    SELECT DISTINCT source_id as id FROM source_embedding
+                    WHERE embedding IS NOT NULL
+                    """
+                )
+                if result:
+                    items["sources"] = [f"source:{item['id']}" for item in result]
             else:
-                items["sources"] = []
+                # SurrealDB: Query sources with embeddings
+                result = await repo_query(
+                    """
+                    SELECT DISTINCT source as id FROM source_embedding
+                    WHERE embedding IS NOT NULL
+                    """
+                )
+                if result:
+                    items["sources"] = [str(item["id"]) for item in result]
         else:  # mode == "all"
-            # Query all sources with content
+            # Query all sources with content (same for both backends)
             result = await repo_query(
                 "SELECT id FROM source WHERE full_text IS NOT NULL"
             )
-            items["sources"] = (
-                [f"source:{item['id']}" for item in result] if result else []
-            )
+            if is_sqlite():
+                items["sources"] = (
+                    [f"source:{item['id']}" for item in result] if result else []
+                )
+            else:
+                items["sources"] = (
+                    [str(item["id"]) for item in result] if result else []
+                )
 
         logger.info(f"Collected {len(items['sources'])} sources for rebuild")
 
@@ -475,9 +536,12 @@ async def collect_items_for_rebuild(
                 "SELECT id FROM note WHERE content IS NOT NULL"
             )
 
-        items["notes"] = (
-            [f"note:{item['id']}" for item in result] if result else []
-        )
+        if is_sqlite():
+            items["notes"] = (
+                [f"note:{item['id']}" for item in result] if result else []
+            )
+        else:
+            items["notes"] = [str(item["id"]) for item in result] if result else []
         logger.info(f"Collected {len(items['notes'])} notes for rebuild")
 
     if include_insights:
@@ -490,9 +554,14 @@ async def collect_items_for_rebuild(
             # Query all insights
             result = await repo_query("SELECT id FROM source_insight")
 
-        items["insights"] = (
-            [f"source_insight:{item['id']}" for item in result] if result else []
-        )
+        if is_sqlite():
+            items["insights"] = (
+                [f"source_insight:{item['id']}" for item in result] if result else []
+            )
+        else:
+            items["insights"] = (
+                [str(item["id"]) for item in result] if result else []
+            )
         logger.info(f"Collected {len(items['insights'])} insights for rebuild")
 
     return items

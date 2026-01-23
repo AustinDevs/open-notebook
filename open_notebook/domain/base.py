@@ -10,8 +10,10 @@ from pydantic import (
     model_validator,
 )
 
-from open_notebook.database.sqlite_repository import (
+from open_notebook.database import (
+    BACKEND_NAME,
     ensure_record_id,
+    is_sqlite,
     repo_create,
     repo_delete,
     repo_query,
@@ -85,17 +87,25 @@ class ObjectModel(BaseModel):
                     raise InvalidInputError(f"No class found for table {table_name}")
                 target_class = cast(Type[T], found_class)
 
-            # SQLite query with proper table name
-            result = await repo_query(
-                f"SELECT * FROM {table_name} WHERE id = ?", (int(id_value),)
-            )
-            if result:
-                # Add the full 'table:id' format to the result
-                result_data = result[0]
-                result_data["id"] = f"{table_name}:{result_data['id']}"
-                return target_class(**result_data)
+            # Backend-specific query
+            if is_sqlite():
+                result = await repo_query(
+                    f"SELECT * FROM {table_name} WHERE id = ?", (int(id_value),)
+                )
+                if result:
+                    # Add the full 'table:id' format to the result
+                    result_data = result[0]
+                    result_data["id"] = f"{table_name}:{result_data['id']}"
+                    return target_class(**result_data)
             else:
-                raise NotFoundError(f"{table_name} with id {id} not found")
+                # SurrealDB query
+                result = await repo_query(
+                    "SELECT * FROM $id", {"id": ensure_record_id(id)}
+                )
+                if result:
+                    return target_class(**result[0])
+
+            raise NotFoundError(f"{table_name} with id {id} not found")
         except NotFoundError:
             raise
         except Exception as e:
@@ -153,8 +163,8 @@ class ObjectModel(BaseModel):
             )
             for key, value in result_list[0].items():
                 if hasattr(self, key):
-                    if key == "id":
-                        # Ensure ID is in 'table:id' format
+                    if key == "id" and is_sqlite():
+                        # For SQLite, ensure ID is in 'table:id' format
                         if isinstance(value, int):
                             value = f"{self.__class__.table_name}:{value}"
                         elif isinstance(value, str) and ":" not in value:
@@ -264,18 +274,25 @@ class RecordModel(BaseModel):
     async def _load_from_db(self):
         """Load data from database if not already loaded"""
         if not getattr(self, "_db_loaded", False):
-            # Parse record_id to get table name (e.g., 'open_notebook:content_settings')
-            parts = self.record_id.split(":")
-            if len(parts) == 2:
-                # Format: "namespace:table" - use table as the actual table name
-                table_name = parts[1]
-            else:
-                table_name = self.record_id
+            if is_sqlite():
+                # Parse record_id to get table name (e.g., 'open_notebook:content_settings')
+                parts = self.record_id.split(":")
+                if len(parts) == 2:
+                    # Format: "namespace:table" - use table as the actual table name
+                    table_name = parts[1]
+                else:
+                    table_name = self.record_id
 
-            # For singleton tables, always use id=1
-            result = await repo_query(
-                f"SELECT * FROM {table_name} WHERE id = ?", (1,)
-            )
+                # For singleton tables, always use id=1
+                result = await repo_query(
+                    f"SELECT * FROM {table_name} WHERE id = ?", (1,)
+                )
+            else:
+                # SurrealDB query
+                result = await repo_query(
+                    "SELECT * FROM ONLY $record_id",
+                    {"record_id": ensure_record_id(self.record_id)},
+                )
 
             # Handle case where record doesn't exist yet
             if result:
@@ -318,25 +335,41 @@ class RecordModel(BaseModel):
             if not str(field_info.annotation).startswith("typing.ClassVar")
         }
 
-        # Parse record_id to get table name
-        parts = self.record_id.split(":")
-        if len(parts) == 2:
-            table_name = parts[1]
-        else:
-            table_name = (
-                self.__class__.table_name
-                if hasattr(self.__class__, "table_name")
-                else "record"
+        if is_sqlite():
+            # Parse record_id to get table name
+            parts = self.record_id.split(":")
+            if len(parts) == 2:
+                table_name = parts[1]
+            else:
+                table_name = (
+                    self.__class__.table_name
+                    if hasattr(self.__class__, "table_name")
+                    else "record"
+                )
+
+            await repo_upsert(
+                table_name,
+                self.record_id,
+                data,
             )
 
-        await repo_upsert(
-            table_name,
-            self.record_id,
-            data,
-        )
+            # Fetch the updated record
+            result = await repo_query(f"SELECT * FROM {table_name} WHERE id = ?", (1,))
+        else:
+            # SurrealDB upsert
+            await repo_upsert(
+                self.__class__.table_name
+                if hasattr(self.__class__, "table_name")
+                else "record",
+                self.record_id,
+                data,
+            )
 
-        # Fetch the updated record
-        result = await repo_query(f"SELECT * FROM {table_name} WHERE id = ?", (1,))
+            result = await repo_query(
+                "SELECT * FROM $record_id",
+                {"record_id": ensure_record_id(self.record_id)},
+            )
+
         if result:
             for key, value in result[0].items():
                 if hasattr(self, key):

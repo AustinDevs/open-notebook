@@ -1,4 +1,21 @@
+# Default configuration: SurrealDB backend (default)
+# To use SQLite instead, set DATABASE_BACKEND=sqlite in docker.env
+# and remove or comment out the surrealdb service and depends_on
+
 services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    volumes:
+      - ./surreal_data:/mydata
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    ports:
+      - "8000:8000"
+    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
+    pull_policy: always
+    user: root
+    restart: always
+
   open_notebook:
     image: lfnovo/open_notebook:v1-latest
     # build:
@@ -10,8 +27,14 @@ services:
     env_file:
       - ./docker.env
     environment:
-      # SQLite database path (inside container)
-      - SQLITE_DB_PATH=/app/data/sqlite-db/open_notebook.db
+      # Uncomment for SQLite backend:
+      # - DATABASE_BACKEND=sqlite
+      # - SQLITE_DB_PATH=/app/data/sqlite-db/open_notebook.db
+      #
+      # Default: SurrealDB (no DATABASE_BACKEND setting needed)
+      - DATABASE_BACKEND=${DATABASE_BACKEND:-surrealdb}
+    depends_on:
+      - surrealdb
     volumes:
       - ./notebook_data:/app/data
     restart: always

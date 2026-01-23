@@ -1,3 +1,7 @@
+# Single-container configuration
+# Supports both SQLite (default for simplicity) and SurrealDB backends
+# Set DATABASE_BACKEND=surrealdb in docker.env for SurrealDB (runs inside container)
+
 services:
   open_notebook_single:
     # image: lfnovo/open_notebook:v1-latest-single
@@ -10,13 +14,20 @@ services:
     env_file:
       - ./docker.env
     environment:
+      # Default to SQLite for single-container mode (simpler, no separate DB process)
+      - DATABASE_BACKEND=${DATABASE_BACKEND:-sqlite}
       # SQLite database path (inside container)
       - SQLITE_DB_PATH=/app/data/sqlite-db/open_notebook.db
+      # For SurrealDB: Override for single-container mode (runs on localhost inside container)
+      - SURREAL_URL=ws://localhost:8000/rpc
     volumes:
       - ./notebook_data:/app/data          # Application data (includes SQLite DB)
+      - ./surreal_single_data:/mydata      # SurrealDB data (if using SurrealDB)
     restart: always
     # Single container includes all services: API, Worker, and Next.js Frontend
+    # When DATABASE_BACKEND=surrealdb, also runs embedded SurrealDB
     # SQLite database is stored in ./notebook_data/sqlite-db/
+    # SurrealDB data is stored in ./surreal_single_data/
     # Access:
     # - Next.js UI: http://localhost:8502
     # - REST API: http://localhost:5055
