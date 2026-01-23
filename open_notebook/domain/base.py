@@ -10,7 +10,7 @@ from pydantic import (
     model_validator,
 )
 
-from open_notebook.database.repository import (
+from open_notebook.database.sqlite_repository import (
     ensure_record_id,
     repo_create,
     repo_delete,
@@ -72,7 +72,8 @@ class ObjectModel(BaseModel):
             raise InvalidInputError("ID cannot be empty")
         try:
             # Get the table name from the ID (everything before the first colon)
-            table_name = id.split(":")[0] if ":" in id else id
+            table_name = id.split(":")[0] if ":" in id else cls.table_name
+            id_value = id.split(":")[1] if ":" in id else id
 
             # If we're calling from a specific subclass and IDs match, use that class
             if cls.table_name and cls.table_name == table_name:
@@ -84,11 +85,19 @@ class ObjectModel(BaseModel):
                     raise InvalidInputError(f"No class found for table {table_name}")
                 target_class = cast(Type[T], found_class)
 
-            result = await repo_query("SELECT * FROM $id", {"id": ensure_record_id(id)})
+            # SQLite query with proper table name
+            result = await repo_query(
+                f"SELECT * FROM {table_name} WHERE id = ?", (int(id_value),)
+            )
             if result:
-                return target_class(**result[0])
+                # Add the full 'table:id' format to the result
+                result_data = result[0]
+                result_data["id"] = f"{table_name}:{result_data['id']}"
+                return target_class(**result_data)
             else:
                 raise NotFoundError(f"{table_name} with id {id} not found")
+        except NotFoundError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching object with id {id}: {str(e)}")
             logger.exception(e)
@@ -144,6 +153,12 @@ class ObjectModel(BaseModel):
             )
             for key, value in result_list[0].items():
                 if hasattr(self, key):
+                    if key == "id":
+                        # Ensure ID is in 'table:id' format
+                        if isinstance(value, int):
+                            value = f"{self.__class__.table_name}:{value}"
+                        elif isinstance(value, str) and ":" not in value:
+                            value = f"{self.__class__.table_name}:{value}"
                     if isinstance(getattr(self, key), BaseModel):
                         setattr(self, key, type(getattr(self, key))(**value))
                     else:
@@ -249,9 +264,17 @@ class RecordModel(BaseModel):
     async def _load_from_db(self):
         """Load data from database if not already loaded"""
         if not getattr(self, "_db_loaded", False):
+            # Parse record_id to get table name (e.g., 'open_notebook:content_settings')
+            parts = self.record_id.split(":")
+            if len(parts) == 2:
+                # Format: "namespace:table" - use table as the actual table name
+                table_name = parts[1]
+            else:
+                table_name = self.record_id
+
+            # For singleton tables, always use id=1
             result = await repo_query(
-                "SELECT * FROM ONLY $record_id",
-                {"record_id": ensure_record_id(self.record_id)},
+                f"SELECT * FROM {table_name} WHERE id = ?", (1,)
             )
 
             # Handle case where record doesn't exist yet
@@ -295,17 +318,25 @@ class RecordModel(BaseModel):
             if not str(field_info.annotation).startswith("typing.ClassVar")
         }
 
+        # Parse record_id to get table name
+        parts = self.record_id.split(":")
+        if len(parts) == 2:
+            table_name = parts[1]
+        else:
+            table_name = (
+                self.__class__.table_name
+                if hasattr(self.__class__, "table_name")
+                else "record"
+            )
+
         await repo_upsert(
-            self.__class__.table_name
-            if hasattr(self.__class__, "table_name")
-            else "record",
+            table_name,
             self.record_id,
             data,
         )
 
-        result = await repo_query(
-            "SELECT * FROM $record_id", {"record_id": ensure_record_id(self.record_id)}
-        )
+        # Fetch the updated record
+        result = await repo_query(f"SELECT * FROM {table_name} WHERE id = ?", (1,))
         if result:
             for key, value in result[0].items():
                 if hasattr(self, key):

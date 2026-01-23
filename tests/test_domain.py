@@ -109,19 +109,20 @@ class TestSourceDomain:
     """Test suite for Source domain model."""
 
     def test_source_command_field_parsing(self):
-        """Test RecordID parsing for command field."""
+        """Test command field parsing."""
         # Test with string command
         source = Source(title="Test", command="command:123")
         assert source.command is not None
+        assert source.command == "command:123"
 
         # Test with None command
         source2 = Source(title="Test", command=None)
         assert source2.command is None
 
-        # Test command is included in save data prep
+        # Test command is included in save data prep as command_id
         source3 = Source(id="source:123", title="Test", command="command:456")
         save_data = source3._prepare_save_data()
-        assert "command" in save_data
+        assert "command_id" in save_data
 
     @pytest.mark.asyncio
     async def test_source_delete_cleans_up_file(self):

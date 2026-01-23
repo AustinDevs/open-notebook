@@ -6,7 +6,11 @@ from pydantic import BaseModel
 from surreal_commands import CommandInput, CommandOutput, command, submit_command
 
 from open_notebook.ai.models import model_manager
-from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
+from open_notebook.database.sqlite_repository import (
+    repo_insert,
+    repo_query,
+    serialize_embedding,
+)
 from open_notebook.domain.notebook import Note, Source, SourceInsight
 from open_notebook.utils.chunking import ContentType, chunk_text, detect_content_type
 from open_notebook.utils.embedding import generate_embedding, generate_embeddings
@@ -142,12 +146,14 @@ async def embed_note_command(input_data: EmbedNoteInput) -> EmbedNoteOutput:
         )
 
         # 3. UPSERT embedding into note record
+        note_id = (
+            int(input_data.note_id.split(":")[1])
+            if ":" in input_data.note_id
+            else int(input_data.note_id)
+        )
         await repo_query(
-            "UPDATE $note_id SET embedding = $embedding",
-            {
-                "note_id": ensure_record_id(input_data.note_id),
-                "embedding": embedding,
-            },
+            "UPDATE note SET embedding = ? WHERE id = ?",
+            (serialize_embedding(embedding), note_id),
         )
 
         processing_time = time.time() - start_time
@@ -235,12 +241,14 @@ async def embed_insight_command(input_data: EmbedInsightInput) -> EmbedInsightOu
         )
 
         # 3. UPSERT embedding into insight record
+        insight_id = (
+            int(input_data.insight_id.split(":")[1])
+            if ":" in input_data.insight_id
+            else int(input_data.insight_id)
+        )
         await repo_query(
-            "UPDATE $insight_id SET embedding = $embedding",
-            {
-                "insight_id": ensure_record_id(input_data.insight_id),
-                "embedding": embedding,
-            },
+            "UPDATE source_insight SET embedding = ? WHERE id = ?",
+            (serialize_embedding(embedding), insight_id),
         )
 
         processing_time = time.time() - start_time
@@ -323,10 +331,15 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
             raise ValueError(f"Source '{input_data.source_id}' has no text to embed")
 
         # 2. DELETE existing embeddings (idempotency)
+        source_id_int = (
+            int(input_data.source_id.split(":")[1])
+            if ":" in input_data.source_id
+            else int(input_data.source_id)
+        )
         logger.debug(f"Deleting existing embeddings for source {input_data.source_id}")
         await repo_query(
-            "DELETE source_embedding WHERE source = $source_id",
-            {"source_id": ensure_record_id(input_data.source_id)},
+            "DELETE FROM source_embedding WHERE source_id = ?",
+            (source_id_int,),
         )
 
         # 3. Detect content type from file path if available
@@ -364,8 +377,8 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
         # 6. Bulk INSERT source_embedding records
         records = [
             {
-                "source": ensure_record_id(input_data.source_id),
-                "order": idx,
+                "source_id": source_id_int,
+                "chunk_order": idx,
                 "content": chunk,
                 "embedding": embedding,
             }
@@ -431,22 +444,22 @@ async def collect_items_for_rebuild(
             # Query sources with embeddings (via source_embedding table)
             result = await repo_query(
                 """
-                RETURN array::distinct(
-                    SELECT VALUE source.id
-                    FROM source_embedding
-                    WHERE embedding != none AND array::len(embedding) > 0
-                )
+                SELECT DISTINCT source_id as id FROM source_embedding
+                WHERE embedding IS NOT NULL
                 """
             )
-            # RETURN returns the array directly as the result (not nested)
             if result:
-                items["sources"] = [str(item) for item in result]
+                items["sources"] = [f"source:{item['id']}" for item in result]
             else:
                 items["sources"] = []
         else:  # mode == "all"
             # Query all sources with content
-            result = await repo_query("SELECT id FROM source WHERE full_text != none")
-            items["sources"] = [str(item["id"]) for item in result] if result else []
+            result = await repo_query(
+                "SELECT id FROM source WHERE full_text IS NOT NULL"
+            )
+            items["sources"] = (
+                [f"source:{item['id']}" for item in result] if result else []
+            )
 
         logger.info(f"Collected {len(items['sources'])} sources for rebuild")
 
@@ -454,26 +467,32 @@ async def collect_items_for_rebuild(
         if mode == "existing":
             # Query notes with embeddings
             result = await repo_query(
-                "SELECT id FROM note WHERE embedding != none AND array::len(embedding) > 0"
+                "SELECT id FROM note WHERE embedding IS NOT NULL"
             )
         else:  # mode == "all"
             # Query all notes (with content)
-            result = await repo_query("SELECT id FROM note WHERE content != none")
+            result = await repo_query(
+                "SELECT id FROM note WHERE content IS NOT NULL"
+            )
 
-        items["notes"] = [str(item["id"]) for item in result] if result else []
+        items["notes"] = (
+            [f"note:{item['id']}" for item in result] if result else []
+        )
         logger.info(f"Collected {len(items['notes'])} notes for rebuild")
 
     if include_insights:
         if mode == "existing":
             # Query insights with embeddings
             result = await repo_query(
-                "SELECT id FROM source_insight WHERE embedding != none AND array::len(embedding) > 0"
+                "SELECT id FROM source_insight WHERE embedding IS NOT NULL"
             )
         else:  # mode == "all"
             # Query all insights
             result = await repo_query("SELECT id FROM source_insight")
 
-        items["insights"] = [str(item["id"]) for item in result] if result else []
+        items["insights"] = (
+            [f"source_insight:{item['id']}" for item in result] if result else []
+        )
         logger.info(f"Collected {len(items['insights'])} insights for rebuild")
 
     return items

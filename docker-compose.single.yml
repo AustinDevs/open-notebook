@@ -10,13 +10,13 @@ services:
     env_file:
       - ./docker.env
     environment:
-      # Override for single-container mode: SurrealDB runs on localhost inside the same container
-      - SURREAL_URL=ws://localhost:8000/rpc
+      # SQLite database path (inside container)
+      - SQLITE_DB_PATH=/app/data/sqlite-db/open_notebook.db
     volumes:
-      - ./notebook_data:/app/data          # Application data
-      - ./surreal_single_data:/mydata      # SurrealDB data
+      - ./notebook_data:/app/data          # Application data (includes SQLite DB)
     restart: always
-    # Single container includes all services: SurrealDB, API, Worker, and Next.js Frontend
+    # Single container includes all services: API, Worker, and Next.js Frontend
+    # SQLite database is stored in ./notebook_data/sqlite-db/
     # Access:
     # - Next.js UI: http://localhost:8502
     # - REST API: http://localhost:5055

@@ -33,7 +33,7 @@ from api.routers import (
     transformations,
 )
 from api.routers import commands as commands_router
-from open_notebook.database.async_migrate import AsyncMigrationManager
+from open_notebook.database.sqlite_migrate import SQLiteMigrationManager
 
 # Import commands to register them in the API process
 try:
@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting API initialization...")
 
     try:
-        migration_manager = AsyncMigrationManager()
+        migration_manager = SQLiteMigrationManager()
         current_version = await migration_manager.get_current_version()
         logger.info(f"Current database version: {current_version}")
 
