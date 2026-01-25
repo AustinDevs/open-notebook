@@ -9,7 +9,10 @@ from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database import (
+    repo_check_relation,
+    repo_get_sessions_for_source,
+)
 from open_notebook.domain.notebook import ChatSession, Source
 from open_notebook.exceptions import (
     NotFoundError,
@@ -148,30 +151,21 @@ async def get_source_chat_sessions(source_id: str = Path(..., description="Sourc
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
 
-        # Get sessions that refer to this source - first get relations, then sessions
-        relations = await repo_query(
-            "SELECT in FROM refers_to WHERE out = $source_id",
-            {"source_id": ensure_record_id(full_source_id)},
-        )
-
+        # Get sessions that refer to this source using unified repo method
+        session_results = await repo_get_sessions_for_source(full_source_id)
         sessions = []
-        for relation in relations:
-            session_id = relation.get("in")
-            if session_id:
-                session_result = await repo_query(f"SELECT * FROM {session_id}")
-                if session_result and len(session_result) > 0:
-                    session_data = session_result[0]
-                    sessions.append(
-                        SourceChatSessionResponse(
-                            id=session_data.get("id") or "",
-                            title=session_data.get("title") or "Untitled Session",
-                            source_id=source_id,
-                            model_override=session_data.get("model_override"),
-                            created=str(session_data.get("created")),
-                            updated=str(session_data.get("updated")),
-                            message_count=0,  # TODO: Add message count if needed
-                        )
-                    )
+        for session_data in session_results:
+            sessions.append(
+                SourceChatSessionResponse(
+                    id=str(session_data.get("id", "")),
+                    title=session_data.get("title") or "Untitled Session",
+                    source_id=source_id,
+                    model_override=session_data.get("model_override"),
+                    created=str(session_data.get("created")),
+                    updated=str(session_data.get("updated")),
+                    message_count=0,
+                )
+            )
 
         # Sort sessions by created date (newest first)
         sessions.sort(key=lambda x: x.created, reverse=True)
@@ -213,16 +207,10 @@ async def get_source_chat_session(
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        # Verify session is related to this source
-        relation_query = await repo_query(
-            "SELECT * FROM refers_to WHERE in = $session_id AND out = $source_id",
-            {
-                "session_id": ensure_record_id(full_session_id),
-                "source_id": ensure_record_id(full_source_id),
-            },
-        )
+        # Verify session is related to this source using unified repo method
+        is_related = await repo_check_relation(full_session_id, "refers_to", full_source_id)
 
-        if not relation_query:
+        if not is_related:
             raise HTTPException(
                 status_code=404, detail="Session not found for this source"
             )
@@ -309,16 +297,10 @@ async def update_source_chat_session(
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        # Verify session is related to this source
-        relation_query = await repo_query(
-            "SELECT * FROM refers_to WHERE in = $session_id AND out = $source_id",
-            {
-                "session_id": ensure_record_id(full_session_id),
-                "source_id": ensure_record_id(full_source_id),
-            },
-        )
+        # Verify session is related to this source using unified repo method
+        is_related = await repo_check_relation(full_session_id, "refers_to", full_source_id)
 
-        if not relation_query:
+        if not is_related:
             raise HTTPException(
                 status_code=404, detail="Session not found for this source"
             )
@@ -376,16 +358,10 @@ async def delete_source_chat_session(
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        # Verify session is related to this source
-        relation_query = await repo_query(
-            "SELECT * FROM refers_to WHERE in = $session_id AND out = $source_id",
-            {
-                "session_id": ensure_record_id(full_session_id),
-                "source_id": ensure_record_id(full_source_id),
-            },
-        )
+        # Verify session is related to this source using unified repo method
+        is_related = await repo_check_relation(full_session_id, "refers_to", full_source_id)
 
-        if not relation_query:
+        if not is_related:
             raise HTTPException(
                 status_code=404, detail="Session not found for this source"
             )
@@ -461,6 +437,7 @@ async def stream_source_chat_response(
 
     except Exception as e:
         logger.error(f"Error in source chat streaming: {str(e)}")
+        logger.exception(e)  # Log full traceback
         error_event = {"type": "error", "message": str(e)}
         yield f"data: {json.dumps(error_event)}\n\n"
 
@@ -491,16 +468,10 @@ async def send_message_to_source_chat(
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        # Verify session is related to this source
-        relation_query = await repo_query(
-            "SELECT * FROM refers_to WHERE in = $session_id AND out = $source_id",
-            {
-                "session_id": ensure_record_id(full_session_id),
-                "source_id": ensure_record_id(full_source_id),
-            },
-        )
+        # Verify session is related to this source using unified repo method
+        is_related = await repo_check_relation(full_session_id, "refers_to", full_source_id)
 
-        if not relation_query:
+        if not is_related:
             raise HTTPException(
                 status_code=404, detail="Session not found for this source"
             )

@@ -14,9 +14,9 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, Response
 from loguru import logger
-from surreal_commands import execute_command_sync
 
 from api.command_service import CommandService
+from open_notebook.database.command_queue import execute_command_sync
 from api.models import (
     AssetModel,
     CreateSourceInsightRequest,
@@ -29,7 +29,11 @@ from api.models import (
 )
 from commands.source_commands import SourceProcessingInput
 from open_notebook.config import UPLOADS_FOLDER
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database import (
+    is_sqlite,
+    repo_get_notebooks_for_source,
+    repo_query,
+)
 from open_notebook.domain.notebook import Notebook, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import InvalidInputError
@@ -175,43 +179,113 @@ async def get_sources(
         # Build ORDER BY clause
         order_clause = f"ORDER BY {sort_by} {sort_order.upper()}"
 
-        # Build the query
-        if notebook_id:
-            # Verify notebook exists first
-            notebook = await Notebook.get(notebook_id)
-            if not notebook:
-                raise HTTPException(status_code=404, detail="Notebook not found")
+        # Build the query - backend-specific
+        if is_sqlite():
+            if notebook_id:
+                # Verify notebook exists first
+                notebook = await Notebook.get(notebook_id)
+                if not notebook:
+                    raise HTTPException(status_code=404, detail="Notebook not found")
 
-            # Query sources for specific notebook - include command field with FETCH
-            query = f"""
-                SELECT id, asset, created, title, updated, topics, command,
-                (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
-                (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
-                FROM (select value in from reference where out=$notebook_id)
-                {order_clause}
-                LIMIT $limit START $offset
-                FETCH command
-            """
-            result = await repo_query(
-                query,
-                {
-                    "notebook_id": ensure_record_id(notebook_id),
-                    "limit": limit,
-                    "offset": offset,
-                },
-            )
+                # Extract numeric ID from 'notebook:123' format
+                nb_id = int(notebook_id.split(":")[1]) if ":" in notebook_id else int(notebook_id)
+
+                # SQLite query for sources in a specific notebook
+                query = f"""
+                    SELECT s.id, s.file_path, s.url, s.title, s.topics, s.command_id,
+                           s.created, s.updated,
+                           COALESCE(ic.insights_count, 0) AS insights_count,
+                           CASE WHEN se.source_id IS NOT NULL THEN 1 ELSE 0 END AS embedded
+                    FROM source s
+                    JOIN source_notebook sn ON s.id = sn.source_id
+                    LEFT JOIN (
+                        SELECT source_id, COUNT(*) as insights_count
+                        FROM source_insight
+                        GROUP BY source_id
+                    ) ic ON s.id = ic.source_id
+                    LEFT JOIN (
+                        SELECT DISTINCT source_id FROM source_embedding
+                    ) se ON s.id = se.source_id
+                    WHERE sn.notebook_id = ?
+                    ORDER BY s.{sort_by} {sort_order.upper()}
+                    LIMIT ? OFFSET ?
+                """
+                result = await repo_query(query, (nb_id, limit, offset))
+            else:
+                # SQLite query for all sources
+                query = f"""
+                    SELECT s.id, s.file_path, s.url, s.title, s.topics, s.command_id,
+                           s.created, s.updated,
+                           COALESCE(ic.insights_count, 0) AS insights_count,
+                           CASE WHEN se.source_id IS NOT NULL THEN 1 ELSE 0 END AS embedded
+                    FROM source s
+                    LEFT JOIN (
+                        SELECT source_id, COUNT(*) as insights_count
+                        FROM source_insight
+                        GROUP BY source_id
+                    ) ic ON s.id = ic.source_id
+                    LEFT JOIN (
+                        SELECT DISTINCT source_id FROM source_embedding
+                    ) se ON s.id = se.source_id
+                    ORDER BY s.{sort_by} {sort_order.upper()}
+                    LIMIT ? OFFSET ?
+                """
+                result = await repo_query(query, (limit, offset))
+
+            # Convert SQLite results to expected format
+            for row in result:
+                # Convert ID to table:id format
+                if "id" in row and not str(row["id"]).startswith("source:"):
+                    row["id"] = f"source:{row['id']}"
+                # Reconstruct asset from file_path and url
+                row["asset"] = {
+                    "file_path": row.pop("file_path", None),
+                    "url": row.pop("url", None),
+                }
+                # Convert command_id to command reference if present
+                if row.get("command_id"):
+                    row["command"] = {"id": f"command:{row['command_id']}", "status": "unknown"}
+                else:
+                    row["command"] = None
+                row.pop("command_id", None)
         else:
-            # Query all sources - include command field with FETCH
-            query = f"""
-                SELECT id, asset, created, title, updated, topics, command,
-                (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
-                (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
-                FROM source
-                {order_clause}
-                LIMIT $limit START $offset
-                FETCH command
-            """
-            result = await repo_query(query, {"limit": limit, "offset": offset})
+            # SurrealDB queries
+            if notebook_id:
+                # Verify notebook exists first
+                notebook = await Notebook.get(notebook_id)
+                if not notebook:
+                    raise HTTPException(status_code=404, detail="Notebook not found")
+
+                # Query sources for specific notebook - include command field with FETCH
+                query = f"""
+                    SELECT id, asset, created, title, updated, topics, command,
+                    (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
+                    (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
+                    FROM (select value in from reference where out=$notebook_id)
+                    {order_clause}
+                    LIMIT $limit START $offset
+                    FETCH command
+                """
+                result = await repo_query(
+                    query,
+                    {
+                        "notebook_id": ensure_record_id(notebook_id),
+                        "limit": limit,
+                        "offset": offset,
+                    },
+                )
+            else:
+                # Query all sources - include command field with FETCH
+                query = f"""
+                    SELECT id, asset, created, title, updated, topics, command,
+                    (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
+                    (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
+                    FROM source
+                    {order_clause}
+                    LIMIT $limit START $offset
+                    FETCH command
+                """
+                result = await repo_query(query, {"limit": limit, "offset": offset})
 
         # Convert result to response model
         # Command data is already fetched via FETCH command clause
@@ -346,6 +420,11 @@ async def create_source(
                 )
 
         # Branch based on processing mode
+        # SQLite doesn't support surreal_commands, force sync processing
+        if is_sqlite() and source_data.async_processing:
+            logger.info("SQLite backend detected, using direct sync processing instead of command queue")
+            source_data.async_processing = False
+
         if source_data.async_processing:
             # ASYNC PATH: Create source record first, then queue command
             logger.info("Using async processing path")
@@ -422,14 +501,11 @@ async def create_source(
                 )
 
         else:
-            # SYNC PATH: Execute synchronously using execute_command_sync
+            # SYNC PATH: Execute synchronously
             logger.info("Using sync processing path")
 
             try:
-                # Import command modules to ensure they're registered
-                import commands.source_commands  # noqa: F401
-
-                # Create source record - let SurrealDB generate the ID
+                # Create source record
                 source = Source(
                     title=source_data.title or "Processing...",
                     topics=[],
@@ -437,47 +513,67 @@ async def create_source(
                 await source.save()
 
                 # Add source to notebooks immediately so it appears in the UI
-                # The source_graph will skip adding duplicates
                 for notebook_id in source_data.notebooks or []:
                     await source.add_to_notebook(notebook_id)
 
-                # Execute command synchronously
-                command_input = SourceProcessingInput(
-                    source_id=str(source.id),
-                    content_state=content_state,
-                    notebook_ids=source_data.notebooks,
-                    transformations=transformation_ids,
-                    embed=source_data.embed,
-                )
+                if is_sqlite():
+                    # SQLite: Call source_graph directly (bypass surreal_commands)
+                    from open_notebook.graphs.source import source_graph
 
-                # Run in thread pool to avoid blocking the event loop
-                # execute_command_sync uses asyncio.run() internally which can't
-                # be called from an already-running event loop (FastAPI)
-                result = await asyncio.to_thread(
-                    execute_command_sync,
-                    "open_notebook",  # app name
-                    "process_source",  # command name
-                    command_input.model_dump(),
-                    300,  # 5 minute timeout for sync processing
-                )
+                    # Load transformation objects
+                    transformations = []
+                    for trans_id in transformation_ids:
+                        transformation = await Transformation.get(trans_id)
+                        if transformation:
+                            transformations.append(transformation)
 
-                if not result.is_success():
-                    logger.error(f"Sync processing failed: {result.error_message}")
-                    # Clean up source record
-                    try:
-                        await source.delete()
-                    except Exception:
-                        pass
-                    # Clean up uploaded file if we created it
-                    if file_path and upload_file:
+                    # Execute source_graph directly
+                    result = await source_graph.ainvoke(
+                        {
+                            "content_state": content_state,
+                            "notebook_ids": source_data.notebooks or [],
+                            "apply_transformations": transformations,
+                            "embed": source_data.embed,
+                            "source_id": str(source.id),
+                        }
+                    )
+
+                    if result.get("error"):
+                        raise Exception(result.get("error"))
+                else:
+                    # SurrealDB: Use execute_command_sync
+                    import commands.source_commands  # noqa: F401
+
+                    command_input = SourceProcessingInput(
+                        source_id=str(source.id),
+                        content_state=content_state,
+                        notebook_ids=source_data.notebooks,
+                        transformations=transformation_ids,
+                        embed=source_data.embed,
+                    )
+
+                    result = execute_command_sync(
+                        "open_notebook",
+                        "process_source",
+                        command_input.model_dump(),
+                        timeout=300,
+                    )
+
+                    if not result.is_success():
+                        logger.error(f"Sync processing failed: {result.error_message}")
                         try:
-                            os.unlink(file_path)
+                            await source.delete()
                         except Exception:
                             pass
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Processing failed: {result.error_message}",
-                    )
+                        if file_path and upload_file:
+                            try:
+                                os.unlink(file_path)
+                            except Exception:
+                                pass
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"Processing failed: {result.error_message}",
+                        )
 
                 # Get the processed source
                 if not source.id:
@@ -508,7 +604,6 @@ async def create_source(
                     embedded_chunks=embedded_chunks,
                     created=str(processed_source.created),
                     updated=str(processed_source.updated),
-                    # No command_id or status for sync processing (legacy behavior)
                 )
 
             except Exception as e:
@@ -616,14 +711,11 @@ async def get_source(source_id: str):
 
         embedded_chunks = await source.get_embedded_chunks()
 
-        # Get associated notebooks
-        notebooks_query = await repo_query(
-            "SELECT VALUE out FROM reference WHERE in = $source_id",
-            {"source_id": ensure_record_id(source.id or source_id)},
-        )
-        notebook_ids = (
-            [str(nb_id) for nb_id in notebooks_query] if notebooks_query else []
-        )
+        # Get associated notebooks using unified repo method
+        full_source_id = source.id or source_id
+        if ":" not in full_source_id:
+            full_source_id = f"source:{full_source_id}"
+        notebook_ids = await repo_get_notebooks_for_source(full_source_id)
 
         return SourceResponse(
             id=source.id or "",
@@ -979,7 +1071,7 @@ async def create_source_insight(source_id: str, request: CreateSourceInsightRequ
         from open_notebook.graphs.transformation import graph as transform_graph
 
         await transform_graph.ainvoke(
-            input=dict(source=source, transformation=transformation)  # type: ignore[arg-type]
+            {"source": source, "transformation": transformation}
         )
 
         # Get the newly created insight (last one)
@@ -1001,4 +1093,5 @@ async def create_source_insight(source_id: str, request: CreateSourceInsightRequ
         raise
     except Exception as e:
         logger.error(f"Error creating insight for source {source_id}: {str(e)}")
+        logger.exception(e)  # Log full traceback
         raise HTTPException(status_code=500, detail=f"Error creating insight: {str(e)}")

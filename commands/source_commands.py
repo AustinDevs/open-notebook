@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 from pydantic import BaseModel
-from surreal_commands import CommandInput, CommandOutput, command
 
-from open_notebook.database.repository import ensure_record_id
+from open_notebook.database import ensure_record_id
+from open_notebook.database.command_queue import CommandInput, CommandOutput, command
 from open_notebook.domain.notebook import Source
 from open_notebook.domain.transformation import Transformation
 

@@ -1,7 +1,8 @@
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
-from surreal_commands import get_command_status, submit_command
+
+from open_notebook.database.command_queue import get_command_status, submit_command
 
 
 class CommandService:

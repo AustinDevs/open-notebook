@@ -4,7 +4,12 @@ from fastapi import APIRouter, HTTPException, Query
 from loguru import logger
 
 from api.models import NotebookCreate, NotebookResponse, NotebookUpdate
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database import (
+    repo_add_relation,
+    repo_check_relation,
+    repo_list_with_counts,
+    repo_remove_relation,
+)
 from open_notebook.domain.notebook import Notebook, Source
 from open_notebook.exceptions import InvalidInputError
 
@@ -18,16 +23,15 @@ async def get_notebooks(
 ):
     """Get all notebooks with optional filtering and ordering."""
     try:
-        # Build the query with counts
-        query = f"""
-            SELECT *,
-            count(<-reference.in) as source_count,
-            count(<-artifact.in) as note_count
-            FROM notebook
-            ORDER BY {order_by}
-        """
-
-        result = await repo_query(query)
+        # Use unified repo_list_with_counts for both backends
+        result = await repo_list_with_counts(
+            "notebook",
+            count_relations={
+                "source_count": ("source_notebook", "notebook_id"),
+                "note_count": ("note_notebook", "notebook_id"),
+            },
+            order_by=order_by,
+        )
 
         # Filter by archived status if specified
         if archived is not None:
@@ -86,19 +90,25 @@ async def create_notebook(notebook: NotebookCreate):
 async def get_notebook(notebook_id: str):
     """Get a specific notebook by ID."""
     try:
-        # Query with counts for single notebook
-        query = """
-            SELECT *,
-            count(<-reference.in) as source_count,
-            count(<-artifact.in) as note_count
-            FROM $notebook_id
-        """
-        result = await repo_query(query, {"notebook_id": ensure_record_id(notebook_id)})
+        # Use unified repo_list_with_counts with a filter
+        result = await repo_list_with_counts(
+            "notebook",
+            count_relations={
+                "source_count": ("source_notebook", "notebook_id"),
+                "note_count": ("note_notebook", "notebook_id"),
+            },
+        )
 
-        if not result:
+        # Find the matching notebook
+        nb = None
+        for notebook in result:
+            if str(notebook.get("id", "")) == notebook_id:
+                nb = notebook
+                break
+
+        if not nb:
             raise HTTPException(status_code=404, detail="Notebook not found")
 
-        nb = result[0]
         return NotebookResponse(
             id=str(nb.get("id", "")),
             name=nb.get("name", ""),
@@ -136,17 +146,23 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate):
 
         await notebook.save()
 
-        # Query with counts after update
-        query = """
-            SELECT *,
-            count(<-reference.in) as source_count,
-            count(<-artifact.in) as note_count
-            FROM $notebook_id
-        """
-        result = await repo_query(query, {"notebook_id": ensure_record_id(notebook_id)})
+        # Get updated counts
+        result = await repo_list_with_counts(
+            "notebook",
+            count_relations={
+                "source_count": ("source_notebook", "notebook_id"),
+                "note_count": ("note_notebook", "notebook_id"),
+            },
+        )
 
-        if result:
-            nb = result[0]
+        # Find the matching notebook
+        nb = None
+        for n in result:
+            if str(n.get("id", "")) == notebook_id:
+                nb = n
+                break
+
+        if nb:
             return NotebookResponse(
                 id=str(nb.get("id", "")),
                 name=nb.get("name", ""),
@@ -194,24 +210,16 @@ async def add_source_to_notebook(notebook_id: str, source_id: str):
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
 
+        # Ensure IDs are in proper format
+        full_source_id = source_id if ":" in source_id else f"source:{source_id}"
+        full_notebook_id = notebook_id if ":" in notebook_id else f"notebook:{notebook_id}"
+
         # Check if reference already exists (idempotency)
-        existing_ref = await repo_query(
-            "SELECT * FROM reference WHERE out = $source_id AND in = $notebook_id",
-            {
-                "notebook_id": ensure_record_id(notebook_id),
-                "source_id": ensure_record_id(source_id),
-            },
-        )
+        exists = await repo_check_relation(full_source_id, "reference", full_notebook_id)
 
         # If reference doesn't exist, create it
-        if not existing_ref:
-            await repo_query(
-                "RELATE $source_id->reference->$notebook_id",
-                {
-                    "notebook_id": ensure_record_id(notebook_id),
-                    "source_id": ensure_record_id(source_id),
-                },
-            )
+        if not exists:
+            await repo_add_relation(full_source_id, "reference", full_notebook_id)
 
         return {"message": "Source linked to notebook successfully"}
     except HTTPException:
@@ -234,14 +242,11 @@ async def remove_source_from_notebook(notebook_id: str, source_id: str):
         if not notebook:
             raise HTTPException(status_code=404, detail="Notebook not found")
 
-        # Delete the reference record linking source to notebook
-        await repo_query(
-            "DELETE FROM reference WHERE out = $notebook_id AND in = $source_id",
-            {
-                "notebook_id": ensure_record_id(notebook_id),
-                "source_id": ensure_record_id(source_id),
-            },
-        )
+        # Ensure IDs are in proper format
+        full_source_id = source_id if ":" in source_id else f"source:{source_id}"
+        full_notebook_id = notebook_id if ":" in notebook_id else f"notebook:{notebook_id}"
+
+        await repo_remove_relation(full_source_id, "reference", full_notebook_id)
 
         return {"message": "Source removed from notebook successfully"}
     except HTTPException:

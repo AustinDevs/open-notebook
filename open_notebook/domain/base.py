@@ -10,14 +10,17 @@ from pydantic import (
     model_validator,
 )
 
-from open_notebook.database.repository import (
+from open_notebook.database import (
+    BACKEND_NAME,
     ensure_record_id,
     repo_create,
     repo_delete,
+    repo_get,
     repo_query,
     repo_relate,
+    repo_singleton_get,
+    repo_singleton_upsert,
     repo_update,
-    repo_upsert,
 )
 from open_notebook.exceptions import (
     DatabaseOperationError,
@@ -34,6 +37,14 @@ class ObjectModel(BaseModel):
     nullable_fields: ClassVar[set[str]] = set()  # Fields that can be saved as None
     created: Optional[datetime] = None
     updated: Optional[datetime] = None
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def parse_id(cls, value):
+        """Parse id field to handle various input formats (int from SQLite, string from SurrealDB)"""
+        if value is None:
+            return None
+        return str(value) if value else None
 
     @classmethod
     async def get_all(cls: Type[T], order_by=None) -> List[T]:
@@ -72,7 +83,7 @@ class ObjectModel(BaseModel):
             raise InvalidInputError("ID cannot be empty")
         try:
             # Get the table name from the ID (everything before the first colon)
-            table_name = id.split(":")[0] if ":" in id else id
+            table_name = id.split(":")[0] if ":" in id else cls.table_name
 
             # If we're calling from a specific subclass and IDs match, use that class
             if cls.table_name and cls.table_name == table_name:
@@ -84,11 +95,14 @@ class ObjectModel(BaseModel):
                     raise InvalidInputError(f"No class found for table {table_name}")
                 target_class = cast(Type[T], found_class)
 
-            result = await repo_query("SELECT * FROM $id", {"id": ensure_record_id(id)})
+            # Use unified repo_get function (works for both backends)
+            result = await repo_get(table_name, id)
             if result:
-                return target_class(**result[0])
-            else:
-                raise NotFoundError(f"{table_name} with id {id} not found")
+                return target_class(**result)
+
+            raise NotFoundError(f"{table_name} with id {id} not found")
+        except NotFoundError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching object with id {id}: {str(e)}")
             logger.exception(e)
@@ -139,6 +153,7 @@ class ObjectModel(BaseModel):
                 )
             # Update the current instance with the result
             # repo_result is a list of dictionaries
+            # Note: Both SQLite and SurrealDB repo functions now return normalized IDs
             result_list: List[Dict[str, Any]] = (
                 repo_result if isinstance(repo_result, list) else [repo_result]
             )
@@ -249,22 +264,12 @@ class RecordModel(BaseModel):
     async def _load_from_db(self):
         """Load data from database if not already loaded"""
         if not getattr(self, "_db_loaded", False):
-            result = await repo_query(
-                "SELECT * FROM ONLY $record_id",
-                {"record_id": ensure_record_id(self.record_id)},
-            )
+            # Use unified singleton function (works for both backends)
+            result = await repo_singleton_get(self.record_id)
 
             # Handle case where record doesn't exist yet
             if result:
-                if isinstance(result, list) and len(result) > 0:
-                    # Standard list response
-                    row = result[0]
-                    if isinstance(row, dict):
-                        for key, value in row.items():
-                            if hasattr(self, key):
-                                object.__setattr__(self, key, value)
-                elif isinstance(result, dict):
-                    # Direct dict response
+                if isinstance(result, dict):
                     for key, value in result.items():
                         if hasattr(self, key):
                             object.__setattr__(self, key, value)
@@ -295,19 +300,11 @@ class RecordModel(BaseModel):
             if not str(field_info.annotation).startswith("typing.ClassVar")
         }
 
-        await repo_upsert(
-            self.__class__.table_name
-            if hasattr(self.__class__, "table_name")
-            else "record",
-            self.record_id,
-            data,
-        )
+        # Use unified singleton function (works for both backends)
+        result = await repo_singleton_upsert(self.record_id, data)
 
-        result = await repo_query(
-            "SELECT * FROM $record_id", {"record_id": ensure_record_id(self.record_id)}
-        )
         if result:
-            for key, value in result[0].items():
+            for key, value in result.items():
                 if hasattr(self, key):
                     object.__setattr__(
                         self, key, value

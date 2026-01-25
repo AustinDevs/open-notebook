@@ -109,10 +109,21 @@ class TestSourceDomain:
     """Test suite for Source domain model."""
 
     def test_source_command_field_parsing(self):
-        """Test RecordID parsing for command field."""
-        # Test with string command
+        """Test command field parsing."""
+        from open_notebook.database import is_sqlite
+
+        # Test with string command - gets converted to RecordID for SurrealDB
         source = Source(title="Test", command="command:123")
         assert source.command is not None
+
+        if is_sqlite():
+            # In SQLite mode, command stays as string
+            assert isinstance(source.command, str)
+            assert "command" in str(source.command) or "123" in str(source.command)
+        else:
+            # The field validator converts string to RecordID, verify via attributes
+            assert source.command.table_name == "command"
+            assert source.command.id == "123"
 
         # Test with None command
         source2 = Source(title="Test", command=None)
@@ -121,7 +132,16 @@ class TestSourceDomain:
         # Test command is included in save data prep
         source3 = Source(id="source:123", title="Test", command="command:456")
         save_data = source3._prepare_save_data()
-        assert "command" in save_data
+
+        if is_sqlite():
+            # In SQLite mode, command is stored as command_id (integer reference)
+            assert "command_id" in save_data
+            assert save_data["command_id"] is not None
+        else:
+            # In SurrealDB mode, command is RecordID
+            assert "command" in save_data
+            assert save_data["command"].table_name == "command"
+            assert save_data["command"].id == "456"
 
     @pytest.mark.asyncio
     async def test_source_delete_cleans_up_file(self):

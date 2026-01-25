@@ -79,8 +79,10 @@ export function useTranslation() {
             return (target as any)[prop];
           }
           
-          // Handle function's own properties
-          if (prop in target) {
+          // Handle function's own properties (only for actual function methods, not generic props)
+          // Exclude 'name' and 'length' which are built-in function properties that conflict with translation keys
+          const FUNCTION_METHODS = new Set(['bind', 'call', 'apply']);
+          if (FUNCTION_METHODS.has(prop) && prop in target) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return (target as any)[prop];
           }

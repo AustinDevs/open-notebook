@@ -3,7 +3,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Union
 from pydantic import ConfigDict, Field, field_validator
 from surrealdb import RecordID
 
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database import ensure_record_id, is_sqlite, repo_query
 from open_notebook.domain.base import ObjectModel
 
 
@@ -37,11 +37,22 @@ class EpisodeProfile(ObjectModel):
     @classmethod
     async def get_by_name(cls, name: str) -> Optional["EpisodeProfile"]:
         """Get episode profile by name"""
-        result = await repo_query(
-            "SELECT * FROM episode_profile WHERE name = $name", {"name": name}
-        )
-        if result:
-            return cls(**result[0])
+        if is_sqlite():
+            result = await repo_query(
+                "SELECT * FROM episode_profile WHERE name = ?", (name,)
+            )
+            if result:
+                # Convert ID to table:id format
+                data = result[0]
+                if "id" in data and not str(data["id"]).startswith("episode_profile:"):
+                    data["id"] = f"episode_profile:{data['id']}"
+                return cls(**data)
+        else:
+            result = await repo_query(
+                "SELECT * FROM episode_profile WHERE name = $name", {"name": name}
+            )
+            if result:
+                return cls(**result[0])
         return None
 
 
@@ -79,11 +90,22 @@ class SpeakerProfile(ObjectModel):
     @classmethod
     async def get_by_name(cls, name: str) -> Optional["SpeakerProfile"]:
         """Get speaker profile by name"""
-        result = await repo_query(
-            "SELECT * FROM speaker_profile WHERE name = $name", {"name": name}
-        )
-        if result:
-            return cls(**result[0])
+        if is_sqlite():
+            result = await repo_query(
+                "SELECT * FROM speaker_profile WHERE name = ?", (name,)
+            )
+            if result:
+                # Convert ID to table:id format
+                data = result[0]
+                if "id" in data and not str(data["id"]).startswith("speaker_profile:"):
+                    data["id"] = f"speaker_profile:{data['id']}"
+                return cls(**data)
+        else:
+            result = await repo_query(
+                "SELECT * FROM speaker_profile WHERE name = $name", {"name": name}
+            )
+            if result:
+                return cls(**result[0])
         return None
 
 
@@ -122,7 +144,7 @@ class PodcastEpisode(ObjectModel):
             return None
 
         try:
-            from surreal_commands import get_command_status
+            from open_notebook.database.command_queue import get_command_status
 
             status = await get_command_status(str(self.command))
             return status.status if status else "unknown"

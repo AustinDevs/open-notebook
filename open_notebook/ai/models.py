@@ -9,7 +9,7 @@ from esperanto import (
 )
 from loguru import logger
 
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database import ensure_record_id, is_sqlite, repo_query
 from open_notebook.domain.base import ObjectModel, RecordModel
 
 ModelType = Union[LanguageModel, EmbeddingModel, SpeechToTextModel, TextToSpeechModel]
@@ -23,9 +23,18 @@ class Model(ObjectModel):
 
     @classmethod
     async def get_models_by_type(cls, model_type):
-        models = await repo_query(
-            "SELECT * FROM model WHERE type=$model_type;", {"model_type": model_type}
-        )
+        if is_sqlite():
+            models = await repo_query(
+                "SELECT * FROM model WHERE type = ?", (model_type,)
+            )
+            # Convert IDs to table:id format
+            for model in models:
+                if "id" in model and not str(model["id"]).startswith("model:"):
+                    model["id"] = f"model:{model['id']}"
+        else:
+            models = await repo_query(
+                "SELECT * FROM model WHERE type=$model_type;", {"model_type": model_type}
+            )
         return [Model(**model) for model in models]
 
 
@@ -43,10 +52,16 @@ class DefaultModels(RecordModel):
     @classmethod
     async def get_instance(cls) -> "DefaultModels":
         """Always fetch fresh defaults from database (override parent caching behavior)"""
-        result = await repo_query(
-            "SELECT * FROM ONLY $record_id",
-            {"record_id": ensure_record_id(cls.record_id)},
-        )
+        if is_sqlite():
+            # For SQLite, the table name is 'default_models' (from record_id)
+            result = await repo_query(
+                "SELECT * FROM default_models WHERE id = ?", (1,)
+            )
+        else:
+            result = await repo_query(
+                "SELECT * FROM ONLY $record_id",
+                {"record_id": ensure_record_id(cls.record_id)},
+            )
 
         if result:
             if isinstance(result, list) and len(result) > 0:

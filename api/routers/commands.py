@@ -3,9 +3,10 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from loguru import logger
 from pydantic import BaseModel, Field
-from surreal_commands import registry
 
 from api.command_service import CommandService
+from open_notebook.database import is_sqlite
+from open_notebook.database.command_queue import COMMAND_REGISTRY
 
 router = APIRouter()
 
@@ -123,35 +124,48 @@ async def cancel_command_job(job_id: str):
 async def debug_registry():
     """Debug endpoint to see what commands are registered"""
     try:
-        # Get all registered commands
-        all_items = registry.get_all_commands()
-
-        # Create JSON-serializable data
         command_items = []
-        for item in all_items:
-            try:
+        commands_dict: dict[str, list[str]] = {}
+
+        if is_sqlite():
+            # Use local command registry for SQLite
+            for (app_id, name), _ in COMMAND_REGISTRY.items():
                 command_items.append(
                     {
-                        "app_id": item.app_id,
-                        "name": item.name,
-                        "full_id": f"{item.app_id}.{item.name}",
+                        "app_id": app_id,
+                        "name": name,
+                        "full_id": f"{app_id}.{name}",
                     }
                 )
-            except Exception as item_error:
-                logger.error(f"Error processing item: {item_error}")
+                if app_id not in commands_dict:
+                    commands_dict[app_id] = []
+                commands_dict[app_id].append(name)
+        else:
+            # Use surreal_commands registry for SurrealDB
+            try:
+                from surreal_commands import registry
 
-        # Get the basic command structure
-        try:
-            commands_dict: dict[str, list[str]] = {}
-            for item in all_items:
-                if item.app_id not in commands_dict:
-                    commands_dict[item.app_id] = []
-                commands_dict[item.app_id].append(item.name)
-        except Exception:
-            commands_dict = {}
+                all_items = registry.get_all_commands()
+
+                for item in all_items:
+                    try:
+                        command_items.append(
+                            {
+                                "app_id": item.app_id,
+                                "name": item.name,
+                                "full_id": f"{item.app_id}.{item.name}",
+                            }
+                        )
+                        if item.app_id not in commands_dict:
+                            commands_dict[item.app_id] = []
+                        commands_dict[item.app_id].append(item.name)
+                    except Exception as item_error:
+                        logger.error(f"Error processing item: {item_error}")
+            except ImportError:
+                logger.warning("surreal_commands not available")
 
         return {
-            "total_commands": len(all_items),
+            "total_commands": len(command_items),
             "commands_by_app": commands_dict,
             "command_items": command_items,
         }

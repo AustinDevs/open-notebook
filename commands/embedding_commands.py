@@ -3,10 +3,25 @@ from typing import Dict, List, Literal, Optional
 
 from loguru import logger
 from pydantic import BaseModel
-from surreal_commands import CommandInput, CommandOutput, command, submit_command
 
 from open_notebook.ai.models import model_manager
-from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
+from open_notebook.database.command_queue import (
+    CommandInput,
+    CommandOutput,
+    command,
+    submit_command,
+)
+from open_notebook.database import (
+    ensure_record_id,
+    format_ids,
+    is_sqlite,
+    parse_id,
+    repo_delete_embeddings,
+    repo_insert,
+    repo_query,
+    repo_update_embedding,
+    serialize_embedding,
+)
 from open_notebook.domain.notebook import Note, Source, SourceInsight
 from open_notebook.utils.chunking import ContentType, chunk_text, detect_content_type
 from open_notebook.utils.embedding import generate_embedding, generate_embeddings
@@ -141,14 +156,8 @@ async def embed_note_command(input_data: EmbedNoteInput) -> EmbedNoteOutput:
             note.content, content_type=ContentType.MARKDOWN
         )
 
-        # 3. UPSERT embedding into note record
-        await repo_query(
-            "UPDATE $note_id SET embedding = $embedding",
-            {
-                "note_id": ensure_record_id(input_data.note_id),
-                "embedding": embedding,
-            },
-        )
+        # 3. UPSERT embedding into note record using unified repo method
+        await repo_update_embedding("note", input_data.note_id, embedding)
 
         processing_time = time.time() - start_time
         logger.info(
@@ -234,14 +243,8 @@ async def embed_insight_command(input_data: EmbedInsightInput) -> EmbedInsightOu
             insight.content, content_type=ContentType.MARKDOWN
         )
 
-        # 3. UPSERT embedding into insight record
-        await repo_query(
-            "UPDATE $insight_id SET embedding = $embedding",
-            {
-                "insight_id": ensure_record_id(input_data.insight_id),
-                "embedding": embedding,
-            },
-        )
+        # 3. UPSERT embedding into insight record using unified repo method
+        await repo_update_embedding("source_insight", input_data.insight_id, embedding)
 
         processing_time = time.time() - start_time
         logger.info(
@@ -322,12 +325,9 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
         if not source.full_text or not source.full_text.strip():
             raise ValueError(f"Source '{input_data.source_id}' has no text to embed")
 
-        # 2. DELETE existing embeddings (idempotency)
+        # 2. DELETE existing embeddings (idempotency) using unified repo method
         logger.debug(f"Deleting existing embeddings for source {input_data.source_id}")
-        await repo_query(
-            "DELETE source_embedding WHERE source = $source_id",
-            {"source_id": ensure_record_id(input_data.source_id)},
-        )
+        await repo_delete_embeddings(input_data.source_id)
 
         # 3. Detect content type from file path if available
         file_path = source.asset.file_path if source.asset else None
@@ -362,15 +362,30 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
             )
 
         # 6. Bulk INSERT source_embedding records
-        records = [
-            {
-                "source": ensure_record_id(input_data.source_id),
-                "order": idx,
-                "content": chunk,
-                "embedding": embedding,
-            }
-            for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
-        ]
+        _, source_id_value = parse_id(input_data.source_id) if ":" in input_data.source_id else ("source", int(input_data.source_id))
+
+        if is_sqlite():
+            records = [
+                {
+                    "source_id": source_id_value,
+                    "chunk_order": idx,
+                    "content": chunk,
+                    "embedding": embedding,
+                }
+                for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+            ]
+        else:
+            # SurrealDB: Use source reference (RecordID)
+            source_record_id = ensure_record_id(input_data.source_id)
+            records = [
+                {
+                    "source": source_record_id,
+                    "chunk_order": idx,
+                    "content": chunk,
+                    "embedding": embedding,
+                }
+                for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+            ]
 
         logger.debug(f"Inserting {len(records)} source_embedding records")
         await repo_insert("source_embedding", records)
@@ -428,52 +443,49 @@ async def collect_items_for_rebuild(
 
     if include_sources:
         if mode == "existing":
-            # Query sources with embeddings (via source_embedding table)
-            result = await repo_query(
-                """
-                RETURN array::distinct(
-                    SELECT VALUE source.id
-                    FROM source_embedding
-                    WHERE embedding != none AND array::len(embedding) > 0
+            if is_sqlite():
+                result = await repo_query(
+                    "SELECT DISTINCT source_id as id FROM source_embedding WHERE embedding IS NOT NULL"
                 )
-                """
-            )
-            # RETURN returns the array directly as the result (not nested)
-            if result:
-                items["sources"] = [str(item) for item in result]
             else:
-                items["sources"] = []
+                result = await repo_query(
+                    "SELECT DISTINCT source as id FROM source_embedding WHERE embedding IS NOT NULL"
+                )
+            if result:
+                items["sources"] = format_ids("source", result)
         else:  # mode == "all"
-            # Query all sources with content
-            result = await repo_query("SELECT id FROM source WHERE full_text != none")
-            items["sources"] = [str(item["id"]) for item in result] if result else []
+            result = await repo_query(
+                "SELECT id FROM source WHERE full_text IS NOT NULL"
+            )
+            if result:
+                items["sources"] = format_ids("source", result)
 
         logger.info(f"Collected {len(items['sources'])} sources for rebuild")
 
     if include_notes:
         if mode == "existing":
-            # Query notes with embeddings
             result = await repo_query(
-                "SELECT id FROM note WHERE embedding != none AND array::len(embedding) > 0"
+                "SELECT id FROM note WHERE embedding IS NOT NULL"
             )
         else:  # mode == "all"
-            # Query all notes (with content)
-            result = await repo_query("SELECT id FROM note WHERE content != none")
+            result = await repo_query(
+                "SELECT id FROM note WHERE content IS NOT NULL"
+            )
 
-        items["notes"] = [str(item["id"]) for item in result] if result else []
+        if result:
+            items["notes"] = format_ids("note", result)
         logger.info(f"Collected {len(items['notes'])} notes for rebuild")
 
     if include_insights:
         if mode == "existing":
-            # Query insights with embeddings
             result = await repo_query(
-                "SELECT id FROM source_insight WHERE embedding != none AND array::len(embedding) > 0"
+                "SELECT id FROM source_insight WHERE embedding IS NOT NULL"
             )
         else:  # mode == "all"
-            # Query all insights
             result = await repo_query("SELECT id FROM source_insight")
 
-        items["insights"] = [str(item["id"]) for item in result] if result else []
+        if result:
+            items["insights"] = format_ids("source_insight", result)
         logger.info(f"Collected {len(items['insights'])} insights for rebuild")
 
     return items

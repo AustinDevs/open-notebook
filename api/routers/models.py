@@ -99,16 +99,26 @@ async def create_model(model_data: ModelCreate):
             )
 
         # Check for duplicate model name under the same provider and type (case-insensitive)
-        from open_notebook.database.repository import repo_query
+        from open_notebook.database import is_sqlite, repo_query
 
-        existing = await repo_query(
-            "SELECT * FROM model WHERE string::lowercase(provider) = $provider AND string::lowercase(name) = $name AND string::lowercase(type) = $type LIMIT 1",
-            {
-                "provider": model_data.provider.lower(),
-                "name": model_data.name.lower(),
-                "type": model_data.type.lower(),
-            },
-        )
+        if is_sqlite():
+            existing = await repo_query(
+                "SELECT * FROM model WHERE LOWER(provider) = ? AND LOWER(name) = ? AND LOWER(type) = ? LIMIT 1",
+                (
+                    model_data.provider.lower(),
+                    model_data.name.lower(),
+                    model_data.type.lower(),
+                ),
+            )
+        else:
+            existing = await repo_query(
+                "SELECT * FROM model WHERE string::lowercase(provider) = $provider AND string::lowercase(name) = $name AND string::lowercase(type) = $type LIMIT 1",
+                {
+                    "provider": model_data.provider.lower(),
+                    "name": model_data.name.lower(),
+                    "type": model_data.type.lower(),
+                },
+            )
         if existing:
             raise HTTPException(
                 status_code=400,

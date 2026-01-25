@@ -1,7 +1,17 @@
 # Load environment variables
+import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Explicitly load .env from the project root
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+# Debug: verify API key is loaded
+if os.getenv("OPENAI_API_KEY"):
+    print(f"✓ OPENAI_API_KEY loaded (ends with ...{os.getenv('OPENAI_API_KEY', '')[-8:]})")
+else:
+    print("✗ OPENAI_API_KEY not found!")
 
 from contextlib import asynccontextmanager
 
@@ -33,7 +43,13 @@ from api.routers import (
     transformations,
 )
 from api.routers import commands as commands_router
-from open_notebook.database.async_migrate import AsyncMigrationManager
+from open_notebook.database import is_sqlite
+
+# Import the appropriate migration manager based on backend
+if is_sqlite():
+    from open_notebook.database.sqlite_migrate import SQLiteMigrationManager
+else:
+    from open_notebook.database.async_migrate import AsyncMigrationManager
 
 # Import commands to register them in the API process
 try:
@@ -49,10 +65,15 @@ async def lifespan(app: FastAPI):
     Runs database migrations automatically on startup.
     """
     # Startup: Run database migrations
-    logger.info("Starting API initialization...")
+    backend_name = "SQLite" if is_sqlite() else "SurrealDB"
+    logger.info(f"Starting API initialization with {backend_name} backend...")
 
     try:
-        migration_manager = AsyncMigrationManager()
+        # Use the appropriate migration manager based on backend
+        if is_sqlite():
+            migration_manager = SQLiteMigrationManager()
+        else:
+            migration_manager = AsyncMigrationManager()
         current_version = await migration_manager.get_current_version()
         logger.info(f"Current database version: {current_version}")
 
@@ -73,12 +94,33 @@ async def lifespan(app: FastAPI):
         # Fail fast - don't start the API with an outdated database schema
         raise RuntimeError(f"Failed to run database migrations: {str(e)}") from e
 
+    # Start command worker for SQLite backend
+    worker_task = None
+    if is_sqlite():
+        try:
+            from open_notebook.database.command_worker import start_worker
+
+            worker_task = await start_worker()
+            logger.success("Command worker started for background job processing")
+        except Exception as e:
+            logger.error(f"Failed to start command worker: {e}")
+            # Continue without worker - jobs will queue but not process
+
     logger.success("API initialization completed successfully")
 
     # Yield control to the application
     yield
 
-    # Shutdown: cleanup if needed
+    # Shutdown: cleanup
+    if worker_task:
+        try:
+            from open_notebook.database.command_worker import stop_worker
+
+            await stop_worker()
+            logger.info("Command worker stopped")
+        except Exception as e:
+            logger.warning(f"Error stopping command worker: {e}")
+
     logger.info("API shutdown complete")
 
 

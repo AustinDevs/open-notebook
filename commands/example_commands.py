@@ -4,7 +4,8 @@ from typing import List, Optional
 
 from loguru import logger
 from pydantic import BaseModel
-from surreal_commands import command
+
+from open_notebook.database.command_queue import command
 
 
 class TextProcessingInput(BaseModel):

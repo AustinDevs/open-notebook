@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database import repo_get_notebook_for_session, repo_query
 from open_notebook.domain.notebook import ChatSession, Note, Notebook, Source
 from open_notebook.exceptions import (
     NotFoundError,
@@ -206,12 +206,7 @@ async def get_session(session_id: str):
             else f"chat_session:{session_id}"
         )
 
-        notebook_query = await repo_query(
-            "SELECT out FROM refers_to WHERE in = $session_id",
-            {"session_id": ensure_record_id(full_session_id)},
-        )
-
-        notebook_id = notebook_query[0]["out"] if notebook_query else None
+        notebook_id = await repo_get_notebook_for_session(full_session_id)
 
         if not notebook_id:
             # This might be an old session created before API migration
@@ -267,11 +262,7 @@ async def update_session(session_id: str, request: UpdateSessionRequest):
             if session_id.startswith("chat_session:")
             else f"chat_session:{session_id}"
         )
-        notebook_query = await repo_query(
-            "SELECT out FROM refers_to WHERE in = $session_id",
-            {"session_id": ensure_record_id(full_session_id)},
-        )
-        notebook_id = notebook_query[0]["out"] if notebook_query else None
+        notebook_id = await repo_get_notebook_for_session(full_session_id)
 
         return ChatSessionResponse(
             id=session.id or "",

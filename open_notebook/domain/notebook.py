@@ -5,12 +5,32 @@ from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, Union
 
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from surreal_commands import submit_command
-from surrealdb import RecordID
 
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database import (
+    ensure_record_id,
+    executor,
+    is_sqlite,
+    parse_id,
+    repo_count_related,
+    repo_count_source_embeddings,
+    repo_delete_embeddings,
+    repo_get_insights_for_source,
+    repo_get_related,
+    repo_get_sessions_for_source,
+    repo_get_source_for_embedding,
+    repo_get_source_for_insight,
+    repo_get_sources_for_notebook,
+    repo_query,
+    repo_update_embedding,
+    serialize_embedding,
+)
+from open_notebook.database.command_queue import get_command_status
 from open_notebook.domain.base import ObjectModel
 from open_notebook.exceptions import DatabaseOperationError, InvalidInputError
+
+# Conditional import for SurrealDB RecordID
+if not is_sqlite():
+    from surrealdb import RecordID
 
 
 class Notebook(ObjectModel):
@@ -28,16 +48,27 @@ class Notebook(ObjectModel):
 
     async def get_sources(self) -> List["Source"]:
         try:
-            srcs = await repo_query(
-                """
-                select * omit source.full_text from (
-                select in as source from reference where out=$id
-                fetch source
-            ) order by source.updated desc
-            """,
-                {"id": ensure_record_id(self.id)},
+            # Use unified repo method for getting related sources
+            srcs = await repo_get_related(
+                source_table="notebook",
+                source_id=self.id,
+                relation="reference",
+                target_table="source",
             )
-            return [Source(**src["source"]) for src in srcs] if srcs else []
+            result = []
+            for src in srcs:
+                src_data = dict(src)
+                # Handle SQLite flattened asset format
+                if "file_path" in src_data or "url" in src_data:
+                    src_data["asset"] = Asset(
+                        file_path=src_data.pop("file_path", None),
+                        url=src_data.pop("url", None),
+                    )
+                # Handle SurrealDB nested format
+                elif "source" in src_data:
+                    src_data = src_data["source"]
+                result.append(Source(**src_data))
+            return result
         except Exception as e:
             logger.error(f"Error fetching sources for notebook {self.id}: {str(e)}")
             logger.exception(e)
@@ -45,16 +76,21 @@ class Notebook(ObjectModel):
 
     async def get_notes(self) -> List["Note"]:
         try:
-            srcs = await repo_query(
-                """
-            select * omit note.content, note.embedding from (
-                select in as note from artifact where out=$id
-                fetch note
-            ) order by note.updated desc
-            """,
-                {"id": ensure_record_id(self.id)},
+            # Use unified repo method for getting related notes
+            notes = await repo_get_related(
+                source_table="notebook",
+                source_id=self.id,
+                relation="artifact",
+                target_table="note",
             )
-            return [Note(**src["note"]) for src in srcs] if srcs else []
+            result = []
+            for note_data in notes:
+                data = dict(note_data)
+                # Handle SurrealDB nested format
+                if "note" in data:
+                    data = data["note"]
+                result.append(Note(**data))
+            return result
         except Exception as e:
             logger.error(f"Error fetching notes for notebook {self.id}: {str(e)}")
             logger.exception(e)
@@ -62,22 +98,23 @@ class Notebook(ObjectModel):
 
     async def get_chat_sessions(self) -> List["ChatSession"]:
         try:
-            srcs = await repo_query(
-                """
-                select * from (
-                    select
-                    <- chat_session as chat_session
-                    from refers_to
-                    where out=$id
-                    fetch chat_session
-                )
-                order by chat_session.updated desc
-            """,
-                {"id": ensure_record_id(self.id)},
+            # Use unified repo method for getting related chat sessions
+            sessions = await repo_get_related(
+                source_table="notebook",
+                source_id=self.id,
+                relation="refers_to",
+                target_table="chat_session",
             )
-            return (
-                [ChatSession(**src["chat_session"][0]) for src in srcs] if srcs else []
-            )
+            result = []
+            for session_data in sessions:
+                data = dict(session_data)
+                # Handle SurrealDB nested format
+                if "chat_session" in data:
+                    data = data["chat_session"]
+                    if isinstance(data, list):
+                        data = data[0]
+                result.append(ChatSession(**data))
+            return result
         except Exception as e:
             logger.error(
                 f"Error fetching chat sessions for notebook {self.id}: {str(e)}"
@@ -94,16 +131,37 @@ class Asset(BaseModel):
 class SourceEmbedding(ObjectModel):
     table_name: ClassVar[str] = "source_embedding"
     content: str
+    source_id: Optional[int] = None
+
+    @field_validator("source_id", mode="before")
+    @classmethod
+    def parse_source_id(cls, value):
+        """Parse source_id to handle 'source:6' format from SurrealDB."""
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            # Handle 'source:6' format
+            if ":" in value:
+                return int(value.split(":")[1])
+            return int(value)
+        return value
 
     async def get_source(self) -> "Source":
         try:
-            src = await repo_query(
-                """
-            select source.* from $id fetch source
-            """,
-                {"id": ensure_record_id(self.id)},
-            )
-            return Source(**src[0]["source"])
+            # Use unified repo function (works for both backends)
+            src_data = await repo_get_source_for_embedding(self.id)
+            if src_data:
+                src_data = dict(src_data)
+                # Handle flattened asset fields (SQLite) vs nested (SurrealDB)
+                if "file_path" in src_data or "url" in src_data:
+                    src_data["asset"] = Asset(
+                        file_path=src_data.pop("file_path", None),
+                        url=src_data.pop("url", None),
+                    )
+                return Source(**src_data)
+            raise DatabaseOperationError(f"Source not found for embedding {self.id}")
         except Exception as e:
             logger.error(f"Error fetching source for embedding {self.id}: {str(e)}")
             logger.exception(e)
@@ -114,16 +172,37 @@ class SourceInsight(ObjectModel):
     table_name: ClassVar[str] = "source_insight"
     insight_type: str
     content: str
+    source_id: Optional[int] = None
+
+    @field_validator("source_id", mode="before")
+    @classmethod
+    def parse_source_id(cls, value):
+        """Parse source_id to handle 'source:6' format from SurrealDB."""
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            # Handle 'source:6' format
+            if ":" in value:
+                return int(value.split(":")[1])
+            return int(value)
+        return value
 
     async def get_source(self) -> "Source":
         try:
-            src = await repo_query(
-                """
-            select source.* from $id fetch source
-            """,
-                {"id": ensure_record_id(self.id)},
-            )
-            return Source(**src[0]["source"])
+            # Use unified repo function (works for both backends)
+            src_data = await repo_get_source_for_insight(self.id)
+            if src_data:
+                src_data = dict(src_data)
+                # Handle flattened asset fields (SQLite) vs nested (SurrealDB)
+                if "file_path" in src_data or "url" in src_data:
+                    src_data["asset"] = Asset(
+                        file_path=src_data.pop("file_path", None),
+                        url=src_data.pop("url", None),
+                    )
+                return Source(**src_data)
+            raise DatabaseOperationError(f"Source not found for insight {self.id}")
         except Exception as e:
             logger.error(f"Error fetching source for insight {self.id}: {str(e)}")
             logger.exception(e)
@@ -149,27 +228,23 @@ class Source(ObjectModel):
     title: Optional[str] = None
     topics: Optional[List[str]] = Field(default_factory=list)
     full_text: Optional[str] = None
-    command: Optional[Union[str, RecordID]] = Field(
-        default=None, description="Link to surreal-commands processing job"
+    command: Optional[Any] = Field(
+        default=None, description="Link to command processing job"
     )
 
     @field_validator("command", mode="before")
     @classmethod
     def parse_command(cls, value):
-        """Parse command field to ensure RecordID format"""
-        if isinstance(value, str) and value:
-            return ensure_record_id(value)
-        return value
-
-    @field_validator("id", mode="before")
-    @classmethod
-    def parse_id(cls, value):
-        """Parse id field to handle both string and RecordID inputs"""
+        """Parse command field - RecordID for SurrealDB, string for SQLite"""
         if value is None:
             return None
-        if isinstance(value, RecordID):
+        if is_sqlite():
             return str(value)
-        return str(value) if value else None
+        else:
+            # SurrealDB: ensure RecordID format
+            if isinstance(value, str) and value:
+                return ensure_record_id(value)
+            return value
 
     async def get_status(self) -> Optional[str]:
         """Get the processing status of the associated command"""
@@ -177,8 +252,6 @@ class Source(ObjectModel):
             return None
 
         try:
-            from surreal_commands import get_command_status
-
             status = await get_command_status(str(self.command))
             return status.status if status else "unknown"
         except Exception as e:
@@ -191,8 +264,6 @@ class Source(ObjectModel):
             return None
 
         try:
-            from surreal_commands import get_command_status
-
             status_result = await get_command_status(str(self.command))
             if not status_result:
                 return None
@@ -231,15 +302,9 @@ class Source(ObjectModel):
 
     async def get_embedded_chunks(self) -> int:
         try:
-            result = await repo_query(
-                """
-                select count() as chunks from source_embedding where source=$id GROUP ALL
-                """,
-                {"id": ensure_record_id(self.id)},
-            )
-            if len(result) == 0:
-                return 0
-            return result[0]["chunks"]
+            # Use unified repo method for counting related embeddings
+            full_source_id = self.id if ":" in self.id else f"source:{self.id}"
+            return await repo_count_source_embeddings(full_source_id)
         except Exception as e:
             logger.error(f"Error fetching chunks count for source {self.id}: {str(e)}")
             logger.exception(e)
@@ -247,12 +312,9 @@ class Source(ObjectModel):
 
     async def get_insights(self) -> List[SourceInsight]:
         try:
-            result = await repo_query(
-                """
-                SELECT * FROM source_insight WHERE source=$id
-                """,
-                {"id": ensure_record_id(self.id)},
-            )
+            full_source_id = self.id if ":" in self.id else f"source:{self.id}"
+            # Use unified repo function (works for both backends)
+            result = await repo_get_insights_for_source(full_source_id)
             return [SourceInsight(**insight) for insight in result]
         except Exception as e:
             logger.error(f"Error fetching insights for source {self.id}: {str(e)}")
@@ -275,8 +337,12 @@ class Source(ObjectModel):
         3. Generates all embeddings in a single API call
         4. Bulk inserts source_embedding records
 
+        For SQLite backend, embedding is done directly (synchronously) via the executor.
+        For SurrealDB backend, embedding is submitted to the command queue.
+
         Returns:
             str: The command/job ID that can be used to track progress via the commands API
+                 (or "direct" for SQLite synchronous embedding)
 
         Raises:
             ValueError: If source has no text to vectorize
@@ -288,20 +354,8 @@ class Source(ObjectModel):
             if not self.full_text:
                 raise ValueError(f"Source {self.id} has no text to vectorize")
 
-            # Submit the embed_source command
-            command_id = submit_command(
-                "open_notebook",
-                "embed_source",
-                {"source_id": str(self.id)},
-            )
-
-            command_id_str = str(command_id)
-            logger.info(
-                f"Embed source job submitted for source {self.id}: "
-                f"command_id={command_id_str}"
-            )
-
-            return command_id_str
+            # Use executor strategy pattern (handles SQLite vs SurrealDB)
+            return await executor.embed_source(self.id)
 
         except Exception as e:
             logger.error(
@@ -314,8 +368,9 @@ class Source(ObjectModel):
         """
         Add an insight to this source.
 
-        Creates the insight record without embedding, then submits an async
-        embed_insight command to generate the embedding in the background.
+        Creates the insight record, then generates the embedding.
+        For SQLite, embedding is done directly (synchronously) via the executor.
+        For SurrealDB, embedding is submitted as an async command via the executor.
 
         Args:
             insight_type: Type/category of the insight
@@ -327,31 +382,47 @@ class Source(ObjectModel):
         if not insight_type or not content:
             raise InvalidInputError("Insight type and content must be provided")
         try:
-            # Create insight WITHOUT embedding (fire-and-forget embedding via command)
-            result = await repo_query(
-                """
-                CREATE source_insight CONTENT {
-                        "source": $source_id,
-                        "insight_type": $insight_type,
-                        "content": $content,
-                };""",
-                {
-                    "source_id": ensure_record_id(self.id),
-                    "insight_type": insight_type,
-                    "content": content,
-                },
-            )
+            # Generate embedding for SQLite (direct executor returns the embedding data)
+            embedding_data = await executor.embed_insight_content(content)
 
-            # Submit embedding command (fire-and-forget)
-            if result and len(result) > 0:
-                insight_id = str(result[0].get("id", ""))
-                if insight_id:
-                    submit_command(
-                        "open_notebook",
-                        "embed_insight",
-                        {"insight_id": insight_id},
-                    )
-                    logger.debug(f"Submitted embed_insight command for {insight_id}")
+            if is_sqlite():
+                source_id = (
+                    int(self.id.split(":")[1]) if ":" in self.id else int(self.id)
+                )
+
+                # Create insight WITH embedding for SQLite
+                result = await repo_query(
+                    """
+                    INSERT INTO source_insight (source_id, insight_type, content, embedding, created)
+                    VALUES (?, ?, ?, ?, datetime('now'))
+                    RETURNING *
+                    """,
+                    (source_id, insight_type, content, embedding_data),
+                )
+
+                logger.debug(f"Created insight for source {self.id} with direct embedding")
+            else:
+                # SurrealDB: Create insight WITHOUT embedding
+                result = await repo_query(
+                    """
+                    CREATE source_insight CONTENT {
+                            "source": $source_id,
+                            "insight_type": $insight_type,
+                            "content": $content,
+                    };""",
+                    {
+                        "source_id": ensure_record_id(self.id),
+                        "insight_type": insight_type,
+                        "content": content,
+                    },
+                )
+
+                # Submit embedding command via executor (fire-and-forget)
+                if result and len(result) > 0:
+                    insight_id = str(result[0].get("id", ""))
+                    if insight_id:
+                        await executor.embed_insight(insight_id)
+                        logger.debug(f"Submitted embed_insight for {insight_id}")
 
             return result
         except Exception as e:
@@ -359,12 +430,29 @@ class Source(ObjectModel):
             raise
 
     def _prepare_save_data(self) -> dict:
-        """Override to ensure command field is always RecordID format for database"""
+        """Override to handle asset and command field per backend"""
         data = super()._prepare_save_data()
 
-        # Ensure command field is RecordID format if not None
-        if data.get("command") is not None:
-            data["command"] = ensure_record_id(data["command"])
+        if is_sqlite():
+            # Flatten asset into file_path and url for SQLite storage
+            asset = data.pop("asset", None)
+            if asset:
+                if isinstance(asset, dict):
+                    data["file_path"] = asset.get("file_path")
+                    data["url"] = asset.get("url")
+                elif isinstance(asset, Asset):
+                    data["file_path"] = asset.file_path
+                    data["url"] = asset.url
+
+            # Ensure command is stored as string (command_id column)
+            if data.get("command") is not None:
+                data["command_id"] = str(data.pop("command"))
+            else:
+                data.pop("command", None)
+        else:
+            # SurrealDB: Ensure command field is RecordID format if not None
+            if data.get("command") is not None:
+                data["command"] = ensure_record_id(data["command"])
 
         return data
 
@@ -389,15 +477,21 @@ class Source(ObjectModel):
 
         # Delete associated embeddings and insights to prevent orphaned records
         try:
-            source_id = ensure_record_id(self.id)
-            await repo_query(
-                "DELETE source_embedding WHERE source = $source_id",
-                {"source_id": source_id},
-            )
-            await repo_query(
-                "DELETE source_insight WHERE source = $source_id",
-                {"source_id": source_id},
-            )
+            full_source_id = self.id if ":" in self.id else f"source:{self.id}"
+            await repo_delete_embeddings(full_source_id)
+
+            # Delete insights
+            _, id_value = parse_id(full_source_id)
+            if is_sqlite():
+                await repo_query(
+                    "DELETE FROM source_insight WHERE source_id = ?",
+                    (id_value,),
+                )
+            else:
+                await repo_query(
+                    "DELETE source_insight WHERE source = $source_id",
+                    {"source_id": ensure_record_id(self.id)},
+                )
             logger.debug(f"Deleted embeddings and insights for source {self.id}")
         except Exception as e:
             logger.warning(
@@ -424,26 +518,26 @@ class Note(ObjectModel):
 
     async def save(self) -> Optional[str]:
         """
-        Save the note and submit embedding command.
+        Save the note and generate embedding.
 
-        Overrides ObjectModel.save() to submit an async embed_note command
-        after saving, instead of inline embedding.
+        Overrides ObjectModel.save() to generate embedding after saving.
+        For SQLite, embedding is done directly (synchronously) via the executor.
+        For SurrealDB, embedding is submitted as an async command via the executor.
 
         Returns:
-            Optional[str]: The command_id if embedding was submitted, None otherwise
+            Optional[str]: The command_id if embedding was submitted (SurrealDB),
+                          "direct" if embedded directly (SQLite), or None if no content
         """
         # Call parent save (without embedding)
         await super().save()
 
-        # Submit embedding command (fire-and-forget) if note has content
+        # Generate embedding if note has content (using executor strategy)
         if self.id and self.content and self.content.strip():
-            command_id = submit_command(
-                "open_notebook",
-                "embed_note",
-                {"note_id": str(self.id)},
-            )
-            logger.debug(f"Submitted embed_note command {command_id} for {self.id}")
-            return command_id
+            try:
+                return await executor.embed_note(self.id)
+            except Exception as e:
+                logger.warning(f"Failed to embed note {self.id}: {e}")
+                return None
 
         return None
 
@@ -488,13 +582,31 @@ async def text_search(
     if not keyword:
         raise InvalidInputError("Search keyword cannot be empty")
     try:
-        search_results = await repo_query(
-            """
-            select *
-            from fn::text_search($keyword, $results, $source, $note)
-            """,
-            {"keyword": keyword, "results": results, "source": source, "note": note},
-        )
+        if is_sqlite():
+            from open_notebook.database.sqlite_search import (
+                text_search as sqlite_text_search,
+            )
+
+            search_results = await sqlite_text_search(
+                query_text=keyword,
+                match_count=results,
+                search_sources=source,
+                search_notes=note,
+            )
+        else:
+            # SurrealDB: Use built-in text search function
+            search_results = await repo_query(
+                """
+                select *
+                from fn::text_search($keyword, $results, $source, $note)
+                """,
+                {
+                    "keyword": keyword,
+                    "results": results,
+                    "source": source,
+                    "note": note,
+                },
+            )
         return search_results
     except Exception as e:
         logger.error(f"Error performing text search: {str(e)}")
@@ -516,18 +628,33 @@ async def vector_search(
 
         # Use unified embedding function (handles chunking if query is very long)
         embed = await generate_embedding(keyword)
-        search_results = await repo_query(
-            """
-            SELECT * FROM fn::vector_search($embed, $results, $source, $note, $minimum_score);
-            """,
-            {
-                "embed": embed,
-                "results": results,
-                "source": source,
-                "note": note,
-                "minimum_score": minimum_score,
-            },
-        )
+
+        if is_sqlite():
+            from open_notebook.database.sqlite_search import (
+                vector_search as sqlite_vector_search,
+            )
+
+            search_results = await sqlite_vector_search(
+                query_embedding=embed,
+                match_count=results,
+                search_sources=source,
+                search_notes=note,
+                min_similarity=minimum_score,
+            )
+        else:
+            # SurrealDB: Use built-in vector search function
+            search_results = await repo_query(
+                """
+                SELECT * FROM fn::vector_search($embed, $results, $source, $note, $minimum_score);
+                """,
+                {
+                    "embed": embed,
+                    "results": results,
+                    "source": source,
+                    "note": note,
+                    "minimum_score": minimum_score,
+                },
+            )
         return search_results
     except Exception as e:
         logger.error(f"Error performing vector search: {str(e)}")

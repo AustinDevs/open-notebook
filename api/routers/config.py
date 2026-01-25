@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Request
 from loguru import logger
 
-from open_notebook.database.repository import repo_query
+from open_notebook.database import is_sqlite, repo_query
 from open_notebook.utils.version_utils import (
     compare_versions,
     get_version_from_github_async,
@@ -107,8 +107,10 @@ async def check_database_health() -> dict:
         dict with 'status' ("online" | "offline") and optional 'error'
     """
     try:
+        # Use appropriate query syntax for each backend
+        health_query = "SELECT 1" if is_sqlite() else "RETURN 1"
         # 2-second timeout for database health check
-        result = await asyncio.wait_for(repo_query("RETURN 1"), timeout=2.0)
+        result = await asyncio.wait_for(repo_query(health_query), timeout=2.0)
         if result:
             return {"status": "online"}
         return {"status": "offline", "error": "Empty result"}
