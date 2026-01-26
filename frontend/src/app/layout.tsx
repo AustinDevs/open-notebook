@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { ConnectionGuard } from "@/components/common/ConnectionGuard";
 import { themeScript } from "@/lib/theme-script";
 import { I18nProvider } from "@/components/providers/I18nProvider";
+import { IframeResizerChild } from "@/components/common/IframeResizerChild";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -34,6 +35,7 @@ export default function RootLayout({
                 <ConnectionGuard>
                   {children}
                   <Toaster />
+                  <IframeResizerChild />
                 </ConnectionGuard>
               </I18nProvider>
             </QueryProvider>
