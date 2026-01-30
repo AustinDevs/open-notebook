@@ -12,6 +12,7 @@ from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.auth import PasswordAuthMiddleware
+from api.jwt_auth import JWTAuthMiddleware
 from api.routers import (
     auth,
     chat,
@@ -89,7 +90,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add password authentication middleware first
+# Add JWT authentication middleware for multi-tenant namespace isolation
+# This must run before password auth to set the tenant context
+app.add_middleware(
+    JWTAuthMiddleware,
+    excluded_paths=[
+        "/",
+        "/health",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+        "/api/auth/status",
+        "/api/config",
+    ],
+)
+
+# Add password authentication middleware
 # Exclude /api/auth/status and /api/config from authentication
 app.add_middleware(
     PasswordAuthMiddleware,

@@ -180,6 +180,30 @@ For self-hosted LLMs, LM Studio, or OpenAI-compatible endpoints:
 
 ---
 
+## JWT Authentication (Multi-Tenant)
+
+For embedding Open Notebook in external applications (e.g., Laravel/Filament via iframe) with per-user namespace isolation:
+
+| Variable | Required? | Default | Description |
+|----------|-----------|---------|-------------|
+| `JWT_AUTH_ENABLED` | No | false | Enable JWT-based namespace authentication |
+| `JWT_SECRET` | If JWT enabled | None | Secret key for JWT signature validation |
+| `JWT_ALGORITHM` | No | HS256 | JWT signing algorithm (HS256, HS384, HS512) |
+
+**JWT Payload Format:**
+```json
+{
+  "namespace": "user_namespace",
+  "database": "open_notebook",
+  "sub": "user_id",
+  "exp": 1234567890
+}
+```
+
+**Usage:** Pass token via URL parameter (`?token=JWT`) or Authorization header (`Bearer JWT`).
+
+---
+
 ## Database: Retry Configuration
 
 | Variable | Required? | Default | Description |

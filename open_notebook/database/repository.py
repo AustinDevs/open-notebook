@@ -6,6 +6,18 @@ from typing import Any, Dict, List, Optional, TypeVar, Union
 from loguru import logger
 from surrealdb import AsyncSurreal, RecordID  # type: ignore
 
+# Import tenant context functions for multi-tenant support
+try:
+    from api.jwt_auth import get_current_database, get_current_namespace
+except ImportError:
+    # Fallback for when running outside API context (e.g., CLI, tests)
+    def get_current_namespace() -> str:
+        return os.environ.get("SURREAL_NAMESPACE", "open_notebook")
+
+    def get_current_database() -> str:
+        return os.environ.get("SURREAL_DATABASE", "open_notebook")
+
+
 T = TypeVar("T", Dict[str, Any], List[Dict[str, Any]])
 
 
@@ -46,6 +58,12 @@ def ensure_record_id(value: Union[str, RecordID]) -> RecordID:
 
 @asynccontextmanager
 async def db_connection():
+    """
+    Create an async database connection with tenant-aware namespace selection.
+
+    When JWT auth is enabled and a valid token is present, uses the namespace
+    from the JWT claims. Otherwise falls back to environment variables.
+    """
     db = AsyncSurreal(get_database_url())
     await db.signin(
         {
@@ -53,9 +71,10 @@ async def db_connection():
             "password": get_database_password(),
         }
     )
-    await db.use(
-        os.environ.get("SURREAL_NAMESPACE"), os.environ.get("SURREAL_DATABASE")
-    )
+    # Use context-aware namespace/database (supports JWT multi-tenancy)
+    namespace = get_current_namespace()
+    database = get_current_database()
+    await db.use(namespace, database)
     try:
         yield db
     finally:

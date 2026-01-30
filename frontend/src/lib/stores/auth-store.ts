@@ -11,11 +11,14 @@ interface AuthState {
   isCheckingAuth: boolean
   hasHydrated: boolean
   authRequired: boolean | null
+  isJwtAuth: boolean  // Track if using JWT vs password auth
   setHasHydrated: (state: boolean) => void
   checkAuthRequired: () => Promise<boolean>
   login: (password: string) => Promise<boolean>
+  setJwtToken: (token: string) => void  // Set JWT token directly (for iframe embedding)
   logout: () => void
   checkAuth: () => Promise<boolean>
+  initFromUrlToken: () => boolean  // Initialize from URL token parameter
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -29,9 +32,54 @@ export const useAuthStore = create<AuthState>()(
       isCheckingAuth: false,
       hasHydrated: false,
       authRequired: null,
+      isJwtAuth: false,
 
       setHasHydrated: (state: boolean) => {
         set({ hasHydrated: state })
+      },
+
+      // Set JWT token directly (used for iframe embedding with external auth)
+      setJwtToken: (token: string) => {
+        set({
+          isAuthenticated: true,
+          token: token,
+          isJwtAuth: true,
+          lastAuthCheck: Date.now(),
+          error: null,
+          authRequired: false  // JWT auth bypasses password requirement
+        })
+      },
+
+      // Initialize auth from URL token parameter (for iframe embedding)
+      // Returns true if a token was found and set
+      initFromUrlToken: () => {
+        if (typeof window === 'undefined') return false
+
+        const urlParams = new URLSearchParams(window.location.search)
+        const token = urlParams.get('token')
+
+        if (token && token.includes('.')) {  // Basic JWT format check (has dots)
+          // Set the token
+          set({
+            isAuthenticated: true,
+            token: token,
+            isJwtAuth: true,
+            lastAuthCheck: Date.now(),
+            error: null,
+            authRequired: false
+          })
+
+          // Optionally remove token from URL for cleaner appearance
+          // (but keep other params)
+          urlParams.delete('token')
+          const newUrl = urlParams.toString()
+            ? `${window.location.pathname}?${urlParams.toString()}`
+            : window.location.pathname
+          window.history.replaceState({}, '', newUrl)
+
+          return true
+        }
+        return false
       },
 
       checkAuthRequired: async () => {
@@ -140,10 +188,11 @@ export const useAuthStore = create<AuthState>()(
       },
       
       logout: () => {
-        set({ 
-          isAuthenticated: false, 
-          token: null, 
-          error: null 
+        set({
+          isAuthenticated: false,
+          token: null,
+          error: null,
+          isJwtAuth: false
         })
       },
       
@@ -212,9 +261,18 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       partialize: (state) => ({
         token: state.token,
-        isAuthenticated: state.isAuthenticated
+        isAuthenticated: state.isAuthenticated,
+        isJwtAuth: state.isJwtAuth
       }),
       onRehydrateStorage: () => (state) => {
+        // Check for URL token before marking as hydrated
+        // This allows iframe embedding to set the token before auth checks run
+        if (state) {
+          const tokenFromUrl = state.initFromUrlToken()
+          if (tokenFromUrl) {
+            console.log('Auth initialized from URL token')
+          }
+        }
         state?.setHasHydrated(true)
       }
     }
