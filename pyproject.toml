@@ -17,6 +17,7 @@ dependencies = [
     "uvicorn>=0.24.0",
     "pydantic>=2.9.2",
     "loguru>=0.7.2",
+    "PyJWT>=2.8.0",
     "langchain>=1.2.0",
     "langgraph>=1.0.5",
     "tiktoken>=0.12.0",
@@ -33,13 +34,15 @@ dependencies = [
     "tomli>=2.0.2",
     "python-dotenv>=1.0.1",
     "httpx[socks]>=0.27.0",
-    "content-core>=1.14.1,<2",
+    "content-core[docling]>=1.14.1,<2",
     "ai-prompter>=0.3,<1",
     "esperanto>=2.18,<3",
     "surrealdb>=1.0.4",
     "podcast-creator>=0.9,<1",
     "surreal-commands>=1.3.1,<2",
     "numpy>=2.4.1",
+    "boto3>=1.35.0",
+    "typer>=0.21.1",
 ]
 
 [tool.setuptools]

@@ -126,6 +126,7 @@ async function fetchConfig(): Promise<AppConfig> {
         latestVersion: data.latestVersion || null,
         hasUpdate: data.hasUpdate || false,
         dbStatus: data.dbStatus, // Can be undefined for old backends
+        authMode: data.authMode || 'password', // Default to password for backwards compatibility
       }
       if (isDev) console.log('✅ [Config] Successfully loaded API config:', config)
       return config

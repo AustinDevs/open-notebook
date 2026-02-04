@@ -10,7 +10,7 @@ from esperanto import (
 from loguru import logger
 
 from open_notebook.ai.key_provider import provision_provider_keys
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database.repository import repo_query
 from open_notebook.domain.base import ObjectModel, RecordModel
 
 ModelType = Union[LanguageModel, EmbeddingModel, SpeechToTextModel, TextToSpeechModel]
@@ -24,14 +24,29 @@ class Model(ObjectModel):
 
     @classmethod
     async def get_models_by_type(cls, model_type):
-        models = await repo_query(
-            "SELECT * FROM model WHERE type=$model_type;", {"model_type": model_type}
-        )
+        """Get all models of a specific type, filtered by current user."""
+        from open_notebook.domain.base import get_current_user_id
+
+        current_user = get_current_user_id()
+        if current_user:
+            # Filter by user_id for multitenancy
+            user_id_str = str(current_user)
+            if not user_id_str.startswith("user:"):
+                user_id_str = f"user:{user_id_str}"
+            models = await repo_query(
+                f"SELECT * FROM model WHERE type=$model_type AND (user_id = {user_id_str} OR user_id = NONE)",
+                {"model_type": model_type}
+            )
+        else:
+            models = await repo_query(
+                "SELECT * FROM model WHERE type=$model_type",
+                {"model_type": model_type}
+            )
         return [Model(**model) for model in models]
 
 
 class DefaultModels(RecordModel):
-    record_id: ClassVar[str] = "open_notebook:default_models"
+    record_id: ClassVar[str] = "open_notebook:default_models"  # Fallback for password auth
     default_chat_model: Optional[str] = None
     default_transformation_model: Optional[str] = None
     large_context_model: Optional[str] = None
@@ -42,12 +57,41 @@ class DefaultModels(RecordModel):
     default_tools_model: Optional[str] = None
 
     @classmethod
+    def _get_record_id_for_user(cls, user_id: Optional[str]) -> str:
+        """
+        Get the record ID for a specific user.
+
+        Multitenancy support:
+        - JWT mode: Returns "default_models:{user_id_suffix}"
+        - Password mode: Returns "open_notebook:default_models"
+        """
+        if user_id:
+            # Extract just the ID part (e.g., "1" from "user:1")
+            user_id_str = str(user_id)
+            if ":" in user_id_str:
+                user_id_suffix = user_id_str.split(":")[-1]
+            else:
+                user_id_suffix = user_id_str
+            return f"default_models:{user_id_suffix}"
+        return cls.record_id
+
+    @classmethod
     async def get_instance(cls) -> "DefaultModels":
-        """Always fetch fresh defaults from database (override parent caching behavior)"""
-        result = await repo_query(
-            "SELECT * FROM ONLY $record_id",
-            {"record_id": ensure_record_id(cls.record_id)},
-        )
+        """
+        Always fetch fresh defaults from database for current user.
+
+        Multitenancy support:
+        - JWT mode: Returns per-user config from "default_models:{user_id}"
+        - Password mode: Returns global config from "open_notebook:default_models"
+        """
+        from open_notebook.domain.base import get_current_user_id
+
+        user_id = get_current_user_id()
+        record_id = cls._get_record_id_for_user(user_id)
+
+        logger.info(f"DefaultModels.get_instance: user_id={user_id}, record_id={record_id}")
+        result = await repo_query(f"SELECT * FROM ONLY {record_id}")
+        logger.info(f"DefaultModels.get_instance: result={result}")
 
         if result:
             if isinstance(result, list) and len(result) > 0:
@@ -64,6 +108,40 @@ class DefaultModels(RecordModel):
         object.__setattr__(instance, "__dict__", {})
         super(RecordModel, instance).__init__(**data)
         return instance
+
+    async def update(self):
+        """
+        Save default models to database for current user.
+
+        Uses per-user record_id for multitenancy support.
+        """
+        from open_notebook.database.repository import repo_upsert
+        from open_notebook.domain.base import get_current_user_id
+
+        user_id = get_current_user_id()
+        record_id = self._get_record_id_for_user(user_id)
+
+        # Get all non-ClassVar fields and their values
+        data = {
+            field_name: getattr(self, field_name)
+            for field_name, field_info in self.model_fields.items()
+            if not str(field_info.annotation).startswith("typing.ClassVar")
+        }
+
+        await repo_upsert(
+            "default_models",
+            record_id,
+            data,
+        )
+
+        # Refresh from database
+        result = await repo_query(f"SELECT * FROM {record_id}")
+        if result:
+            for key, value in result[0].items():
+                if hasattr(self, key):
+                    object.__setattr__(self, key, value)
+
+        return self
 
 
 class ModelManager:

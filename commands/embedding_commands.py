@@ -1,15 +1,38 @@
+import re
 import time
 from typing import Dict, List, Literal, Optional
 
 from loguru import logger
 from pydantic import BaseModel
 from surreal_commands import CommandInput, CommandOutput, command, submit_command
+from surrealdb import RecordID
 
 from open_notebook.ai.models import model_manager
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
 from open_notebook.domain.notebook import Note, Source, SourceInsight
 from open_notebook.utils.chunking import ContentType, chunk_text, detect_content_type
 from open_notebook.utils.embedding import generate_embedding, generate_embeddings
+
+
+def set_user_context(user_id: Optional[str]) -> None:
+    """
+    Set the user context for the current command execution.
+
+    This allows domain models to properly filter and associate records
+    with the correct user during command processing.
+    """
+    logger.debug(f"set_user_context called with user_id={user_id}")
+    if user_id:
+        try:
+            from api.auth import current_user_id
+
+            current_user_id.set(user_id)
+            logger.info(f"User context set to: {user_id}")
+        except ImportError as e:
+            # api.auth not available in worker context
+            logger.warning(f"Could not import api.auth for user context: {e}")
+    else:
+        logger.warning("set_user_context called with None user_id")
 
 
 def full_model_dump(model):
@@ -60,6 +83,7 @@ class CreateInsightInput(CommandInput):
     source_id: str
     insight_type: str
     content: str
+    user_id: Optional[str] = None  # For multitenancy context propagation
 
 
 class CreateInsightOutput(CommandOutput):
@@ -75,6 +99,7 @@ class EmbedNoteInput(CommandInput):
     """Input for embedding a single note."""
 
     note_id: str
+    user_id: Optional[str] = None  # For multitenancy context propagation
 
 
 class EmbedNoteOutput(CommandOutput):
@@ -90,6 +115,7 @@ class EmbedInsightInput(CommandInput):
     """Input for embedding a single source insight."""
 
     insight_id: str
+    user_id: Optional[str] = None  # For multitenancy context propagation
 
 
 class EmbedInsightOutput(CommandOutput):
@@ -105,6 +131,7 @@ class EmbedSourceInput(CommandInput):
     """Input for embedding a source (creates multiple chunk embeddings)."""
 
     source_id: str
+    user_id: Optional[str] = None  # For multitenancy context propagation
 
 
 class EmbedSourceOutput(CommandOutput):
@@ -137,9 +164,10 @@ async def embed_note_command(input_data: EmbedNoteInput) -> EmbedNoteOutput:
     for notes that exceed the chunk size limit.
 
     Flow:
-    1. Load Note by ID
-    2. Generate embedding via generate_embedding() (auto-chunks + mean pools if needed)
-    3. UPSERT note embedding in database
+    1. Set user context for multitenancy
+    2. Load Note by ID
+    3. Generate embedding via generate_embedding() (auto-chunks + mean pools if needed)
+    4. UPSERT note embedding in database
 
     Retry Strategy:
     - Retries up to 5 times for transient failures (network, timeout, etc.)
@@ -149,6 +177,9 @@ async def embed_note_command(input_data: EmbedNoteInput) -> EmbedNoteOutput:
     start_time = time.time()
 
     try:
+        # Set user context for multitenancy
+        set_user_context(input_data.user_id)
+
         logger.info(f"Starting embedding for note: {input_data.note_id}")
 
         # 1. Load note
@@ -229,9 +260,10 @@ async def embed_insight_command(input_data: EmbedInsightInput) -> EmbedInsightOu
     for insights that exceed the chunk size limit.
 
     Flow:
-    1. Load SourceInsight by ID
-    2. Generate embedding via generate_embedding() (auto-chunks + mean pools if needed)
-    3. UPSERT insight embedding in database
+    1. Set user context for multitenancy
+    2. Load SourceInsight by ID
+    3. Generate embedding via generate_embedding() (auto-chunks + mean pools if needed)
+    4. UPSERT insight embedding in database
 
     Retry Strategy:
     - Retries up to 5 times for transient failures (network, timeout, etc.)
@@ -241,6 +273,9 @@ async def embed_insight_command(input_data: EmbedInsightInput) -> EmbedInsightOu
     start_time = time.time()
 
     try:
+        # Set user context for multitenancy
+        set_user_context(input_data.user_id)
+
         logger.info(f"Starting embedding for insight: {input_data.insight_id}")
 
         # 1. Load insight
@@ -323,12 +358,13 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
     Uses content-type aware chunking based on file extension or content heuristics.
 
     Flow:
-    1. Load Source by ID
-    2. DELETE existing source_embedding records for this source
-    3. Detect content type from file path or content
-    4. Chunk text using appropriate splitter
-    5. Generate embeddings for all chunks in a single API call
-    6. Bulk INSERT source_embedding records
+    1. Set user context for multitenancy
+    2. Load Source by ID
+    3. DELETE existing source_embedding records for this source
+    4. Detect content type from file path or content
+    5. Chunk text using appropriate splitter
+    6. Generate embeddings for all chunks in a single API call
+    7. Bulk INSERT source_embedding records with user_id
 
     Retry Strategy:
     - Retries up to 5 times for transient failures (network, timeout, etc.)
@@ -338,6 +374,9 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
     start_time = time.time()
 
     try:
+        # Set user context for multitenancy
+        set_user_context(input_data.user_id)
+
         logger.info(f"Starting embedding for source: {input_data.source_id}")
 
         # 1. Load source
@@ -388,13 +427,25 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
                 f"for {len(chunks)} chunks"
             )
 
-        # 6. Bulk INSERT source_embedding records
+        # 7. Bulk INSERT source_embedding records with user_id
+        # Create clean RecordID for user_id (user:1 not user:⟨1⟩)
+        user_id_record = None
+        if input_data.user_id:
+            user_id_val = str(input_data.user_id)
+            match = re.search(r"(\d+)", user_id_val)
+            if match:
+                user_id_record = RecordID("user", int(match.group(1)))
+            else:
+                id_part = user_id_val.split(":")[-1] if ":" in user_id_val else user_id_val
+                user_id_record = RecordID("user", id_part)
+
         records = [
             {
                 "source": ensure_record_id(input_data.source_id),
                 "order": idx,
                 "content": chunk,
                 "embedding": embedding,
+                "user_id": user_id_record,
             }
             for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings))
         ]
@@ -474,26 +525,54 @@ async def create_insight_command(
     start_time = time.time()
 
     try:
+        # Set user context for multitenancy
+        set_user_context(input_data.user_id)
+
         logger.info(
             f"Creating insight for source {input_data.source_id}: "
             f"type={input_data.insight_type}"
         )
 
         # 1. Create insight record in database
-        result = await repo_query(
-            """
-            CREATE source_insight CONTENT {
-                "source": $source_id,
-                "insight_type": $insight_type,
-                "content": $content
-            };
-            """,
-            {
-                "source_id": ensure_record_id(input_data.source_id),
-                "insight_type": input_data.insight_type,
-                "content": input_data.content,
-            },
-        )
+        # Build params with optional user_id
+        params = {
+            "source_id": ensure_record_id(input_data.source_id),
+            "insight_type": input_data.insight_type,
+            "content": input_data.content,
+        }
+
+        # Add user_id if present, using clean RecordID format
+        if input_data.user_id:
+            user_id_val = str(input_data.user_id)
+            match = re.search(r"(\d+)", user_id_val)
+            if match:
+                params["user_id"] = RecordID("user", int(match.group(1)))
+            else:
+                id_part = user_id_val.split(":")[-1] if ":" in user_id_val else user_id_val
+                params["user_id"] = RecordID("user", id_part)
+
+            result = await repo_query(
+                """
+                CREATE source_insight CONTENT {
+                    "source": $source_id,
+                    "insight_type": $insight_type,
+                    "content": $content,
+                    "user_id": $user_id
+                };
+                """,
+                params,
+            )
+        else:
+            result = await repo_query(
+                """
+                CREATE source_insight CONTENT {
+                    "source": $source_id,
+                    "insight_type": $insight_type,
+                    "content": $content
+                };
+                """,
+                params,
+            )
 
         if not result or len(result) == 0:
             raise ValueError("Failed to create insight - no result returned")
@@ -503,10 +582,11 @@ async def create_insight_command(
             raise ValueError("Failed to create insight - no ID in result")
 
         # 2. Submit embedding command (fire-and-forget)
+        # Include user_id for multitenancy
         submit_command(
             "open_notebook",
             "embed_insight",
-            {"insight_id": insight_id},
+            {"insight_id": insight_id, "user_id": input_data.user_id},
         )
         logger.debug(f"Submitted embed_insight command for {insight_id}")
 

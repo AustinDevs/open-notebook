@@ -13,7 +13,7 @@ from typing import ClassVar, Optional
 
 from pydantic import Field, SecretStr
 
-from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.database.repository import repo_query
 from open_notebook.domain.base import RecordModel
 from open_notebook.utils.encryption import decrypt_value, encrypt_value
 
@@ -195,10 +195,8 @@ class APIKeyConfig(RecordModel):
         Returns:
             APIKeyConfig: Fresh instance with current database values
         """
-        result = await repo_query(
-            "SELECT * FROM ONLY $record_id",
-            {"record_id": ensure_record_id(cls.record_id)},
-        )
+        # Use direct interpolation since record_id is from class definition
+        result = await repo_query(f"SELECT * FROM ONLY {cls.record_id}")
 
         if result:
             if isinstance(result, list) and len(result) > 0:

@@ -6,6 +6,7 @@ from loguru import logger
 from pydantic import BaseModel
 from surreal_commands import CommandInput, CommandOutput, command
 
+from open_notebook.ai.key_provider import provision_all_keys
 from open_notebook.config import DATA_FOLDER
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.podcasts.models import EpisodeProfile, PodcastEpisode, SpeakerProfile
@@ -28,12 +29,32 @@ def full_model_dump(model):
         return model
 
 
+def set_user_context(user_id: Optional[str]) -> None:
+    """
+    Set the user context for the current command execution.
+
+    This allows domain models to properly filter and associate records
+    with the correct user during command processing.
+    """
+    logger.debug(f"set_user_context called with user_id={user_id}")
+    if user_id:
+        try:
+            from api.auth import current_user_id
+
+            current_user_id.set(user_id)
+            logger.info(f"User context set to: {user_id}")
+        except ImportError as e:
+            # api.auth not available in worker context
+            logger.warning(f"Could not import api.auth for user context: {e}")
+
+
 class PodcastGenerationInput(CommandInput):
     episode_profile: str
     speaker_profile: str
     episode_name: str
     content: str
     briefing_suffix: Optional[str] = None
+    user_id: Optional[str] = None  # For multitenancy context propagation
 
 
 class PodcastGenerationOutput(CommandOutput):
@@ -60,6 +81,13 @@ async def generate_podcast_command(
             f"Starting podcast generation for episode: {input_data.episode_name}"
         )
         logger.info(f"Using episode profile: {input_data.episode_profile}")
+
+        # Set user context for multitenancy before provisioning keys
+        set_user_context(input_data.user_id)
+
+        # Provision API keys from database for worker context
+        await provision_all_keys()
+        logger.info("Provisioned API keys from database")
 
         # 1. Load Episode and Speaker profiles from SurrealDB
         episode_profile = await EpisodeProfile.get_by_name(input_data.episode_profile)
@@ -119,8 +147,11 @@ async def generate_podcast_command(
 
         logger.info(f"Generated briefing (length: {len(briefing)} chars)")
 
-        # 5. Create output directory
-        output_dir = Path(f"{DATA_FOLDER}/podcasts/episodes/{input_data.episode_name}")
+        # 5. Create output directory (user-specific for multitenancy)
+        from open_notebook.config import get_user_podcasts_folder
+
+        podcasts_folder = get_user_podcasts_folder(input_data.user_id)
+        output_dir = Path(podcasts_folder) / input_data.episode_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"Created output directory: {output_dir}")
@@ -137,9 +168,38 @@ async def generate_podcast_command(
             episode_profile=episode_profile.name,
         )
 
-        episode.audio_file = (
-            str(result.get("final_output_file_path")) if result else None
-        )
+        # Get the local audio file path from podcast-creator result
+        local_audio_path = result.get("final_output_file_path") if result else None
+
+        # Upload to S3 if enabled
+        if local_audio_path:
+            from open_notebook.utils.storage import is_s3_enabled, upload_file
+
+            if is_s3_enabled():
+                try:
+                    # Read local file and upload to S3
+                    with open(local_audio_path, "rb") as f:
+                        audio_content = f.read()
+
+                    # Upload to S3 with the same relative path
+                    s3_path = upload_file(
+                        audio_content, str(local_audio_path), "audio/mpeg"
+                    )
+                    episode.audio_file = s3_path
+                    logger.info(f"Uploaded podcast audio to S3: {s3_path}")
+
+                    # Optionally delete local file after successful S3 upload
+                    try:
+                        Path(local_audio_path).unlink()
+                        logger.info(f"Deleted local audio file after S3 upload: {local_audio_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete local file after S3 upload: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to upload audio to S3, using local path: {e}")
+                    episode.audio_file = str(local_audio_path)
+            else:
+                episode.audio_file = str(local_audio_path)
+
         episode.transcript = {
             "transcript": full_model_dump(result["transcript"]) if result else None
         }

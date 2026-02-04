@@ -1,0 +1,46 @@
+# Docker Compose override for Litestream SQLite replication
+#
+# Usage:
+#   docker compose -f docker-compose.full.yml -f docker-compose.litestream.yml up
+#
+# Required Environment Variables (in docker.env):
+#   AWS_BUCKET=your-bucket-name
+#   AWS_ENDPOINT=https://nyc3.digitaloceanspaces.com
+#   AWS_ACCESS_KEY_ID=your-access-key
+#   AWS_SECRET_ACCESS_KEY=your-secret-key
+#   AWS_DEFAULT_REGION=us-east-1
+
+services:
+  # Litestream sidecar for SQLite replication
+  litestream:
+    image: litestream/litestream:0.3
+    volumes:
+      - ./litestream.yml:/etc/litestream.yml:ro
+      - ./notebook_data:/app/data
+    env_file:
+      - ./docker.env
+    command: replicate -config /etc/litestream.yml
+    restart: always
+    depends_on:
+      - open_notebook
+    # Health check to ensure replication is running
+    healthcheck:
+      test: ["CMD", "litestream", "generations", "-config", "/etc/litestream.yml", "/app/data/sqlite-db/checkpoints.sqlite"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Override for open_notebook to restore from S3 on startup (optional)
+  # Uncomment to enable automatic restoration on container start
+  # open_notebook:
+  #   entrypoint: ["/bin/sh", "-c"]
+  #   command:
+  #     - |
+  #       # Restore SQLite from S3 if it doesn't exist locally
+  #       if [ ! -f /app/data/sqlite-db/checkpoints.sqlite ] && [ "$S3_ENABLED" = "true" ]; then
+  #         echo "Restoring SQLite from S3..."
+  #         litestream restore -config /etc/litestream.yml /app/data/sqlite-db/checkpoints.sqlite || true
+  #       fi
+  #       # Start the application
+  #       exec /app/start.sh

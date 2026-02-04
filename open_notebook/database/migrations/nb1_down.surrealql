@@ -1,0 +1,27 @@
+-- Rollback Migration nb1: Remove multitenancy support
+-- Note: This does NOT remove existing user_id values, only the schema definitions
+
+-- Remove user_id indexes and fields from tables
+REMOVE INDEX IF EXISTS transformation_user_id ON TABLE transformation;
+REMOVE FIELD IF EXISTS user_id ON TABLE transformation;
+
+REMOVE INDEX IF EXISTS source_insight_user_id ON TABLE source_insight;
+REMOVE FIELD IF EXISTS user_id ON TABLE source_insight;
+
+REMOVE INDEX IF EXISTS source_embedding_user_id ON TABLE source_embedding;
+REMOVE FIELD IF EXISTS user_id ON TABLE source_embedding;
+
+REMOVE INDEX IF EXISTS chat_session_user_id ON TABLE chat_session;
+REMOVE FIELD IF EXISTS user_id ON TABLE chat_session;
+
+REMOVE INDEX IF EXISTS note_user_id ON TABLE note;
+REMOVE FIELD IF EXISTS user_id ON TABLE note;
+
+REMOVE INDEX IF EXISTS source_user_id ON TABLE source;
+REMOVE FIELD IF EXISTS user_id ON TABLE source;
+
+REMOVE INDEX IF EXISTS notebook_user_id ON TABLE notebook;
+REMOVE FIELD IF EXISTS user_id ON TABLE notebook;
+
+-- Remove user table
+REMOVE TABLE IF EXISTS user;

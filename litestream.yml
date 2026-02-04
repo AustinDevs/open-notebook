@@ -1,0 +1,37 @@
+# Litestream Configuration for SQLite Replication
+# This replicates the LangGraph checkpoint database to S3-compatible storage
+#
+# Environment Variables Required:
+#   AWS_BUCKET              - S3 bucket name
+#   AWS_ENDPOINT            - S3 endpoint URL (e.g., https://nyc3.digitaloceanspaces.com)
+#   AWS_ACCESS_KEY_ID       - AWS access key ID
+#   AWS_SECRET_ACCESS_KEY   - AWS secret access key
+#   AWS_DEFAULT_REGION      - AWS region (default: us-east-1)
+#
+# Usage:
+#   litestream replicate -config litestream.yml
+#
+# Or with Docker:
+#   docker run --rm -v ./litestream.yml:/etc/litestream.yml \
+#              -v ./data:/app/data \
+#              -e AWS_BUCKET -e AWS_ENDPOINT -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+#              litestream/litestream replicate -config /etc/litestream.yml
+
+dbs:
+  # LangGraph checkpoint database
+  - path: /app/data/sqlite-db/checkpoints.sqlite
+    replicas:
+      - type: s3
+        bucket: ${AWS_BUCKET}
+        path: sqlite-backups/checkpoints
+        endpoint: ${AWS_ENDPOINT}
+        access-key-id: ${AWS_ACCESS_KEY_ID}
+        secret-access-key: ${AWS_SECRET_ACCESS_KEY}
+        region: ${AWS_DEFAULT_REGION}
+        # Retention settings
+        retention: 72h
+        retention-check-interval: 1h
+        # Snapshot frequency (full backup)
+        snapshot-interval: 1h
+        # Sync interval for WAL changes
+        sync-interval: 1s

@@ -1,0 +1,36 @@
+-- Migration nb1: Add multitenancy support with user_id fields
+-- Creates user table and adds user_id foreign key to all data tables
+
+-- Create user table
+-- Note: The user ID is the 'sub' claim from JWT (e.g., user:abc123)
+DEFINE TABLE IF NOT EXISTS user SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS created ON TABLE user TYPE option<datetime> DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS updated ON TABLE user TYPE option<datetime> DEFAULT time::now();
+
+-- Add user_id to notebook
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE notebook TYPE option<record<user>>;
+DEFINE INDEX IF NOT EXISTS notebook_user_id ON TABLE notebook COLUMNS user_id;
+
+-- Add user_id to source
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE source TYPE option<record<user>>;
+DEFINE INDEX IF NOT EXISTS source_user_id ON TABLE source COLUMNS user_id;
+
+-- Add user_id to note
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE note TYPE option<record<user>>;
+DEFINE INDEX IF NOT EXISTS note_user_id ON TABLE note COLUMNS user_id;
+
+-- Add user_id to chat_session
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE chat_session TYPE option<record<user>>;
+DEFINE INDEX IF NOT EXISTS chat_session_user_id ON TABLE chat_session COLUMNS user_id;
+
+-- Add user_id to source_embedding
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE source_embedding TYPE option<record<user>>;
+DEFINE INDEX IF NOT EXISTS source_embedding_user_id ON TABLE source_embedding COLUMNS user_id;
+
+-- Add user_id to source_insight
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE source_insight TYPE option<record<user>>;
+DEFINE INDEX IF NOT EXISTS source_insight_user_id ON TABLE source_insight COLUMNS user_id;
+
+-- Add user_id to transformation
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE transformation TYPE option<record<user>>;
+DEFINE INDEX IF NOT EXISTS transformation_user_id ON TABLE transformation COLUMNS user_id;

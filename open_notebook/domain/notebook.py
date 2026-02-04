@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, Union
 
@@ -432,11 +433,11 @@ class Source(ObjectModel):
             if not self.full_text:
                 raise ValueError(f"Source {self.id} has no text to vectorize")
 
-            # Submit the embed_source command
+            # Submit the embed_source command with user_id for multitenancy
             command_id = submit_command(
                 "open_notebook",
                 "embed_source",
-                {"source_id": str(self.id)},
+                {"source_id": str(self.id), "user_id": self.user_id},
             )
 
             command_id_str = str(command_id)
@@ -482,6 +483,7 @@ class Source(ObjectModel):
         try:
             # Submit create_insight command (fire-and-forget)
             # Command handles retries internally for transaction conflicts
+            # Include user_id for multitenancy
             command_id = submit_command(
                 "open_notebook",
                 "create_insight",
@@ -489,6 +491,7 @@ class Source(ObjectModel):
                     "source_id": str(self.id),
                     "insight_type": insight_type,
                     "content": content,
+                    "user_id": str(self.user_id) if self.user_id else None,
                 },
             )
             logger.info(
@@ -496,7 +499,6 @@ class Source(ObjectModel):
                 f"(type={insight_type})"
             )
             return str(command_id)
-
         except Exception as e:
             logger.error(f"Error submitting create_insight for source {self.id}: {e}")
             return None
@@ -579,11 +581,12 @@ class Note(ObjectModel):
         await super().save()
 
         # Submit embedding command (fire-and-forget) if note has content
+        # Include user_id for multitenancy
         if self.id and self.content and self.content.strip():
             command_id = submit_command(
                 "open_notebook",
                 "embed_note",
-                {"note_id": str(self.id)},
+                {"note_id": str(self.id), "user_id": self.user_id},
             )
             logger.debug(f"Submitted embed_note command {command_id} for {self.id}")
             return command_id
@@ -626,11 +629,32 @@ class ChatSession(ObjectModel):
 
 
 async def text_search(
-    keyword: str, results: int, source: bool = True, note: bool = True
+    keyword: str,
+    results: int,
+    source: bool = True,
+    note: bool = True,
+    user_id: Optional[str] = None,
 ):
+    """
+    Perform text search across sources and notes.
+
+    Args:
+        keyword: Search keyword
+        results: Maximum number of results to return
+        source: Include sources in search
+        note: Include notes in search
+        user_id: Optional user ID for filtering (multitenancy).
+                 If None, uses current user context if available.
+    """
     if not keyword:
         raise InvalidInputError("Search keyword cannot be empty")
     try:
+        # Get user_id from context if not provided
+        if user_id is None:
+            from open_notebook.domain.base import get_current_user_id
+
+            user_id = get_current_user_id()
+
         search_results = await repo_query(
             """
             select *
@@ -638,6 +662,35 @@ async def text_search(
             """,
             {"keyword": keyword, "results": results, "source": source, "note": note},
         )
+
+        # Filter results by user_id if set (multitenancy)
+        if user_id and search_results:
+            # Normalize user_id for comparison
+            user_id_str = str(user_id)
+            if ":" in user_id_str:
+                user_id_suffix = user_id_str.split(":")[-1]
+            else:
+                user_id_suffix = user_id_str
+
+            filtered_results = []
+            for result in search_results:
+                result_user_id = result.get("user_id")
+                if result_user_id is None:
+                    # Include results with no user_id (legacy data)
+                    filtered_results.append(result)
+                else:
+                    # Check if user_id matches
+                    result_user_str = str(result_user_id)
+                    if ":" in result_user_str:
+                        result_user_suffix = result_user_str.split(":")[-1]
+                    else:
+                        result_user_suffix = result_user_str
+
+                    if result_user_suffix == user_id_suffix:
+                        filtered_results.append(result)
+
+            return filtered_results[:results]  # Limit to requested results
+
         return search_results
     except Exception as e:
         logger.error(f"Error performing text search: {str(e)}")
@@ -651,11 +704,30 @@ async def vector_search(
     source: bool = True,
     note: bool = True,
     minimum_score=0.2,
+    user_id: Optional[str] = None,
 ):
+    """
+    Perform vector/semantic search across sources and notes.
+
+    Args:
+        keyword: Search query text
+        results: Maximum number of results to return
+        source: Include sources in search
+        note: Include notes in search
+        minimum_score: Minimum similarity score threshold
+        user_id: Optional user ID for filtering (multitenancy).
+                 If None, uses current user context if available.
+    """
     if not keyword:
         raise InvalidInputError("Search keyword cannot be empty")
     try:
         from open_notebook.utils.embedding import generate_embedding
+
+        # Get user_id from context if not provided
+        if user_id is None:
+            from open_notebook.domain.base import get_current_user_id
+
+            user_id = get_current_user_id()
 
         # Use unified embedding function (handles chunking if query is very long)
         embed = await generate_embedding(keyword)
@@ -671,6 +743,35 @@ async def vector_search(
                 "minimum_score": minimum_score,
             },
         )
+
+        # Filter results by user_id if set (multitenancy)
+        if user_id and search_results:
+            # Normalize user_id for comparison
+            user_id_str = str(user_id)
+            if ":" in user_id_str:
+                user_id_suffix = user_id_str.split(":")[-1]
+            else:
+                user_id_suffix = user_id_str
+
+            filtered_results = []
+            for result in search_results:
+                result_user_id = result.get("user_id")
+                if result_user_id is None:
+                    # Include results with no user_id (legacy data)
+                    filtered_results.append(result)
+                else:
+                    # Check if user_id matches
+                    result_user_str = str(result_user_id)
+                    if ":" in result_user_str:
+                        result_user_suffix = result_user_str.split(":")[-1]
+                    else:
+                        result_user_suffix = result_user_str
+
+                    if result_user_suffix == user_id_suffix:
+                        filtered_results.append(result)
+
+            return filtered_results[:results]  # Limit to requested results
+
         return search_results
     except Exception as e:
         logger.error(f"Error performing vector search: {str(e)}")

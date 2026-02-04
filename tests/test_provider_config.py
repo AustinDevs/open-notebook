@@ -442,3 +442,77 @@ class TestProviderConfigEdgeCases:
 
         # Provider name is stored as-is
         assert cred.provider == "openai"
+
+
+# =============================================================================
+# TEST SUITE 5: Multitenancy - user_id in save data
+# =============================================================================
+
+
+class TestProviderConfigMultitenancy:
+    """Test suite for multitenancy user_id field in save data."""
+
+    def setup_method(self):
+        """Clear ProviderConfig singleton before each test."""
+        ProviderConfig._clear_for_test()
+
+    def test_prepare_save_data_with_user_id(self):
+        """Test that _prepare_save_data includes user_id when provided."""
+        config = ProviderConfig()
+        cred = ProviderCredential(
+            id="openai:1",
+            name="Test",
+            provider="openai",
+            api_key=SecretStr("sk-test"),
+        )
+        config.add_config("openai", cred)
+
+        # Call with user_id
+        data = config._prepare_save_data(user_id="user:abc123")
+
+        assert "user_id" in data
+        assert data["user_id"] == "user:abc123"
+        assert "credentials" in data
+
+    def test_prepare_save_data_normalizes_user_id(self):
+        """Test that _prepare_save_data normalizes user_id to full format."""
+        config = ProviderConfig()
+
+        # Call with short-form user_id (no prefix)
+        data = config._prepare_save_data(user_id="abc123")
+
+        assert data["user_id"] == "user:abc123"
+
+    def test_prepare_save_data_preserves_full_user_id(self):
+        """Test that _prepare_save_data preserves full user_id format."""
+        config = ProviderConfig()
+
+        # Call with full-form user_id (with prefix)
+        data = config._prepare_save_data(user_id="user:xyz789")
+
+        assert data["user_id"] == "user:xyz789"
+
+    def test_prepare_save_data_without_user_id(self):
+        """Test that _prepare_save_data omits user_id when not provided."""
+        config = ProviderConfig()
+        cred = ProviderCredential(
+            id="openai:1",
+            name="Test",
+            provider="openai",
+        )
+        config.add_config("openai", cred)
+
+        # Call without user_id
+        data = config._prepare_save_data()
+
+        assert "user_id" not in data
+        assert "credentials" in data
+
+    def test_prepare_save_data_none_user_id(self):
+        """Test that _prepare_save_data omits user_id when explicitly None."""
+        config = ProviderConfig()
+
+        # Call with explicit None
+        data = config._prepare_save_data(user_id=None)
+
+        assert "user_id" not in data

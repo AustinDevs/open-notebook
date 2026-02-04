@@ -5,6 +5,7 @@ from loguru import logger
 from pydantic import BaseModel
 from surreal_commands import get_command_status, submit_command
 
+from api.auth import current_user_id
 from open_notebook.domain.notebook import Notebook
 from open_notebook.podcasts.models import EpisodeProfile, PodcastEpisode, SpeakerProfile
 
@@ -76,12 +77,16 @@ class PodcastService:
                 )
 
             # Prepare command arguments
+            # Get current user_id for multitenancy
+            user_id = current_user_id.get()
+
             command_args = {
                 "episode_profile": episode_profile_name,
                 "speaker_profile": speaker_profile_name,
                 "episode_name": episode_name,
                 "content": str(content),
                 "briefing_suffix": briefing_suffix,
+                "user_id": str(user_id) if user_id else None,
             }
 
             # Ensure command modules are imported before submitting

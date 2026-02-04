@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from api.auth import PasswordAuthMiddleware
+from api.auth import JWTAuthMiddleware, PasswordAuthMiddleware, current_user_id
 from api.routers import (
     api_keys,
     auth,
@@ -121,20 +122,49 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add password authentication middleware first
-# Exclude /api/auth/status and /api/config from authentication
-app.add_middleware(
-    PasswordAuthMiddleware,
-    excluded_paths=[
-        "/",
-        "/health",
-        "/docs",
-        "/openapi.json",
-        "/redoc",
-        "/api/auth/status",
-        "/api/config",
-    ],
-)
+# Authentication middleware configuration
+# AUTH_MODE: "password" (legacy) or "jwt" (SaaS embed)
+AUTH_MODE = os.environ.get("AUTH_MODE", "password")
+
+# Common paths excluded from authentication
+AUTH_EXCLUDED_PATHS = [
+    "/",
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/api/auth/status",
+    "/api/config",
+]
+
+if AUTH_MODE == "jwt":
+    logger.info("Using JWT authentication mode")
+    app.add_middleware(
+        JWTAuthMiddleware,
+        excluded_paths=AUTH_EXCLUDED_PATHS,
+    )
+else:
+    logger.info("Using password authentication mode")
+    app.add_middleware(
+        PasswordAuthMiddleware,
+        excluded_paths=AUTH_EXCLUDED_PATHS,
+    )
+
+
+@app.middleware("http")
+async def clear_user_context_middleware(request: Request, call_next):
+    """
+    Middleware to clear user context at the start of each request.
+
+    This ensures clean state for each request and prevents any potential
+    context leakage between requests. The auth middleware will then set
+    the appropriate user_id.
+    """
+    # Reset context to None at the start of each request
+    current_user_id.set(None)
+    response = await call_next(request)
+    return response
+
 
 # Add CORS middleware last (so it processes first)
 app.add_middleware(

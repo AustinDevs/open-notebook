@@ -16,6 +16,16 @@ from open_notebook.domain.notebook import Notebook
 from open_notebook.utils import clean_thinking_content
 
 
+def _restore_user_context(user_id: str | None) -> None:
+    """Restore user context in a new event loop/thread for multitenancy."""
+    if user_id:
+        try:
+            from api.auth import current_user_id
+            current_user_id.set(user_id)
+        except ImportError:
+            pass  # api.auth not available in this context
+
+
 class ThreadState(TypedDict):
     messages: Annotated[list, add_messages]
     notebook: Optional[Notebook]
@@ -30,6 +40,8 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
     model_id = config.get("configurable", {}).get("model_id") or state.get(
         "model_override"
     )
+    # Extract user_id from config for context propagation
+    user_id = config.get("configurable", {}).get("user_id")
 
     # Handle async model provisioning from sync context
     def run_in_new_loop():
@@ -37,6 +49,8 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
         new_loop = asyncio.new_event_loop()
         try:
             asyncio.set_event_loop(new_loop)
+            # Restore user context for multitenancy (lost in new loop/thread)
+            _restore_user_context(user_id)
             return new_loop.run_until_complete(
                 provision_langchain_model(
                     str(payload), model_id, "chat", max_tokens=8192
@@ -56,15 +70,8 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
             future = executor.submit(run_in_new_loop)
             model = future.result()
     except RuntimeError:
-        # No event loop running, safe to use asyncio.run()
-        model = asyncio.run(
-            provision_langchain_model(
-                str(payload),
-                model_id,
-                "chat",
-                max_tokens=8192,
-            )
-        )
+        # No event loop running, use the same function that restores context
+        model = run_in_new_loop()
 
     ai_message = model.invoke(payload)
 

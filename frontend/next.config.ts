@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   // Enable standalone output for optimized Docker deployment
   output: "standalone",
 
+  // Base path for deployment behind a reverse proxy (e.g., /notebook)
+  // Reads from NEXT_PUBLIC_BASE_PATH env var, defaults to empty string
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
+
   // Experimental features
   // Type assertion needed: proxyClientMaxBodySize is valid in Next.js 15 but types lag behind
   experimental: {

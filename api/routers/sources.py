@@ -1,7 +1,7 @@
 import asyncio
 import os
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import (
     APIRouter,
@@ -12,10 +12,11 @@ from fastapi import (
     Query,
     UploadFile,
 )
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from loguru import logger
 from surreal_commands import execute_command_sync, submit_command
 
+from api.auth import current_user_id
 from api.command_service import CommandService
 from api.models import (
     AssetModel,
@@ -38,10 +39,42 @@ from open_notebook.exceptions import InvalidInputError
 router = APIRouter()
 
 
+def get_user_filter_clause(prefix: str = "") -> tuple[str, Dict[str, Any]]:
+    """
+    Get SQL WHERE clause and params for user filtering.
+
+    Args:
+        prefix: Table prefix for the user_id field (e.g., "source." for joins)
+
+    Returns a tuple of (clause, params) where clause is either:
+    - "" (empty string) if no user context
+    - "WHERE {prefix}user_id = user:{id} OR {prefix}user_id = NONE" if user context exists
+
+    Note: Uses direct interpolation for user_id because SurrealDB Python driver
+    doesn't correctly pass RecordID parameters in WHERE clauses.
+    """
+    user_id = current_user_id.get()
+    if user_id:
+        field = f"{prefix}user_id" if prefix else "user_id"
+        # Ensure proper format and use direct interpolation (safe - from validated JWT)
+        user_id_str = str(user_id)
+        if not user_id_str.startswith("user:"):
+            user_id_str = f"user:{user_id_str}"
+        return (
+            f"WHERE {field} = {user_id_str} OR {field} = NONE",
+            {},
+        )
+    return ("", {})
+
+
 def generate_unique_filename(original_filename: str, upload_folder: str) -> str:
-    """Generate unique filename like Streamlit app (append counter if file exists)."""
-    file_path = Path(upload_folder)
-    file_path.mkdir(parents=True, exist_ok=True)
+    """Generate unique filename (append counter if file exists)."""
+    from open_notebook.utils.storage import file_exists, is_s3_enabled
+
+    # For local storage, ensure directory exists
+    if not is_s3_enabled():
+        file_path = Path(upload_folder)
+        file_path.mkdir(parents=True, exist_ok=True)
 
     # Split filename and extension
     stem = Path(original_filename).stem
@@ -55,33 +88,47 @@ def generate_unique_filename(original_filename: str, upload_folder: str) -> str:
         else:
             new_filename = f"{stem} ({counter}){suffix}"
 
-        full_path = file_path / new_filename
-        if not full_path.exists():
+        full_path = os.path.join(upload_folder, new_filename)
+        if not file_exists(full_path):
             return str(full_path)
         counter += 1
 
 
-async def save_uploaded_file(upload_file: UploadFile) -> str:
-    """Save uploaded file to uploads folder and return file path."""
+async def save_uploaded_file(
+    upload_file: UploadFile, user_id: Optional[str] = None
+) -> str:
+    """Save uploaded file to user-specific storage (local or S3) and return path."""
+    from open_notebook.config import get_user_uploads_folder
+    from open_notebook.utils.storage import delete_file, is_s3_enabled, upload_file as storage_upload
+
     if not upload_file.filename:
         raise ValueError("No filename provided")
 
-    # Generate unique filename
-    file_path = generate_unique_filename(upload_file.filename, UPLOADS_FOLDER)
+    # Get user-specific upload folder
+    upload_folder = get_user_uploads_folder(user_id)
+
+    # Generate unique filename in user's folder
+    file_path = generate_unique_filename(upload_file.filename, upload_folder)
 
     try:
-        # Save file
-        with open(file_path, "wb") as f:
-            content = await upload_file.read()
-            f.write(content)
+        # Read file content
+        content = await upload_file.read()
 
-        logger.info(f"Saved uploaded file to: {file_path}")
-        return file_path
+        # Determine content type
+        content_type = upload_file.content_type
+
+        # Upload to storage (local or S3)
+        storage_path = storage_upload(content, file_path, content_type)
+
+        logger.info(f"Saved uploaded file to: {storage_path}")
+        return storage_path
     except Exception as e:
         logger.error(f"Failed to save uploaded file: {e}")
         # Clean up partial file if it exists
-        if os.path.exists(file_path):
-            os.unlink(file_path)
+        try:
+            delete_file(file_path)
+        except Exception:
+            pass
         raise
 
 
@@ -176,16 +223,22 @@ async def get_sources(
         # Build ORDER BY clause
         order_clause = f"ORDER BY {sort_by} {sort_order.upper()}"
 
+        # Get user filter for multitenancy
+        user_clause, user_params = get_user_filter_clause()
+        base_params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        base_params.update(user_params)
+
         # Build the query
         if notebook_id:
-            # Verify notebook exists first
+            # Verify notebook exists first (will apply user filter)
             notebook = await Notebook.get(notebook_id)
             if not notebook:
                 raise HTTPException(status_code=404, detail="Notebook not found")
 
             # Query sources for specific notebook - include command field with FETCH
+            # Note: If notebook is accessible, sources in it should be too
             query = f"""
-                SELECT id, asset, created, title, updated, topics, command,
+                SELECT id, asset, created, title, updated, topics, command, user_id,
                 (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
                 (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
                 FROM (select value in from reference where out=$notebook_id)
@@ -193,26 +246,21 @@ async def get_sources(
                 LIMIT $limit START $offset
                 FETCH command
             """
-            result = await repo_query(
-                query,
-                {
-                    "notebook_id": ensure_record_id(notebook_id),
-                    "limit": limit,
-                    "offset": offset,
-                },
-            )
+            base_params["notebook_id"] = ensure_record_id(notebook_id)
+            result = await repo_query(query, base_params)
         else:
-            # Query all sources - include command field with FETCH
+            # Query all sources with user filtering - include command field with FETCH
             query = f"""
-                SELECT id, asset, created, title, updated, topics, command,
+                SELECT id, asset, created, title, updated, topics, command, user_id,
                 (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
                 (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
                 FROM source
+                {user_clause}
                 {order_clause}
                 LIMIT $limit START $offset
                 FETCH command
             """
-            result = await repo_query(query, {"limit": limit, "offset": offset})
+            result = await repo_query(query, base_params)
 
         # Convert result to response model
         # Command data is already fetched via FETCH command clause
@@ -301,7 +349,8 @@ async def create_source(
         # Handle file upload if provided
         if upload_file and source_data.type == "upload":
             try:
-                file_path = await save_uploaded_file(upload_file)
+                user_id = current_user_id.get()
+                file_path = await save_uploaded_file(upload_file, user_id)
             except Exception as e:
                 logger.error(f"File upload failed: {e}")
                 raise HTTPException(
@@ -370,12 +419,14 @@ async def create_source(
                 import commands.source_commands  # noqa: F401
 
                 # Submit command for background processing
+                # Include user_id for multitenancy context propagation
                 command_input = SourceProcessingInput(
                     source_id=str(source.id),
                     content_state=content_state,
                     notebook_ids=source_data.notebooks,
                     transformations=transformation_ids,
                     embed=source_data.embed,
+                    user_id=current_user_id.get(),
                 )
 
                 command_id = await CommandService.submit_command_job(
@@ -445,12 +496,14 @@ async def create_source(
                     await source.add_to_notebook(notebook_id)
 
                 # Execute command synchronously
+                # Include user_id for multitenancy context propagation
                 command_input = SourceProcessingInput(
                     source_id=str(source.id),
                     content_state=content_state,
                     notebook_ids=source_data.notebooks,
                     transformations=transformation_ids,
                     embed=source_data.embed,
+                    user_id=current_user_id.get(),
                 )
 
                 # Run in thread pool to avoid blocking the event loop
@@ -560,6 +613,9 @@ async def create_source_json(source_data: SourceCreate):
 
 
 async def _resolve_source_file(source_id: str) -> tuple[str, str]:
+    """Resolve source file path, supporting both local and S3 storage."""
+    from open_notebook.utils.storage import file_exists
+
     source = await Source.get(source_id)
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -568,6 +624,14 @@ async def _resolve_source_file(source_id: str) -> tuple[str, str]:
     if not file_path:
         raise HTTPException(status_code=404, detail="Source has no file to download")
 
+    # For S3 URIs, validate bucket and check existence
+    if file_path.startswith("s3://"):
+        if not file_exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found in storage")
+        filename = file_path.split("/")[-1]
+        return file_path, filename
+
+    # For local files, validate path is within uploads directory
     safe_root = os.path.realpath(UPLOADS_FOLDER)
     resolved_path = os.path.realpath(file_path)
 
@@ -585,10 +649,19 @@ async def _resolve_source_file(source_id: str) -> tuple[str, str]:
 
 
 def _is_source_file_available(source: Source) -> Optional[bool]:
+    """Check if source file is available, supporting both local and S3 storage."""
+    from open_notebook.utils.storage import file_exists
+
     if not source or not source.asset or not source.asset.file_path:
         return None
 
     file_path = source.asset.file_path
+
+    # For S3 URIs, just check existence
+    if file_path.startswith("s3://"):
+        return file_exists(file_path)
+
+    # For local files, validate path is within uploads directory
     safe_root = os.path.realpath(UPLOADS_FOLDER)
     resolved_path = os.path.realpath(file_path)
 
@@ -674,8 +747,21 @@ async def check_source_file(source_id: str):
 @router.get("/sources/{source_id}/download")
 async def download_source_file(source_id: str):
     """Download the original file associated with an uploaded source."""
+    from open_notebook.utils.storage import get_file_stream
+
     try:
         resolved_path, filename = await _resolve_source_file(source_id)
+
+        # Handle S3 files with streaming response
+        if resolved_path.startswith("s3://"):
+            stream = get_file_stream(resolved_path)
+            return StreamingResponse(
+                stream,
+                media_type="application/octet-stream",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+
+        # Local files use FileResponse
         return FileResponse(
             path=resolved_path,
             filename=filename,
@@ -854,12 +940,14 @@ async def retry_source_processing(source_id: str):
             import commands.source_commands  # noqa: F401
 
             # Submit new command for background processing
+            # Include user_id for multitenancy context propagation
             command_input = SourceProcessingInput(
                 source_id=str(source.id),
                 content_state=content_state,
                 notebook_ids=notebook_ids,
                 transformations=[],  # Use default transformations on retry
                 embed=True,  # Always embed on retry
+                user_id=current_user_id.get(),
             )
 
             command_id = await CommandService.submit_command_job(

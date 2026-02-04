@@ -9,12 +9,45 @@ from open_notebook.database.repository import ensure_record_id
 from open_notebook.domain.notebook import Source
 from open_notebook.domain.transformation import Transformation
 
+# Import content-core exceptions for handling file processing errors
+try:
+    from content_core.common.exceptions import UnsupportedTypeException
+except ImportError:
+    UnsupportedTypeException = None  # type: ignore[misc,assignment]
+
+# Import docling exception for handling conversion errors
+try:
+    from docling.exceptions import ConversionError as DoclingConversionError
+except ImportError:
+    DoclingConversionError = None  # type: ignore[misc,assignment]
+
 try:
     from open_notebook.graphs.source import source_graph
     from open_notebook.graphs.transformation import graph as transform_graph
 except ImportError as e:
     logger.error(f"Failed to import graphs: {e}")
     raise ValueError("graphs not available")
+
+
+def set_user_context(user_id: Optional[str]) -> None:
+    """
+    Set the user context for the current command execution.
+
+    This allows domain models to properly filter and associate records
+    with the correct user during command processing.
+    """
+    logger.debug(f"set_user_context called with user_id={user_id}")
+    if user_id:
+        try:
+            from api.auth import current_user_id
+
+            current_user_id.set(user_id)
+            logger.info(f"User context set to: {user_id}")
+        except ImportError as e:
+            # api.auth not available in worker context
+            logger.warning(f"Could not import api.auth for user context: {e}")
+    else:
+        logger.warning("set_user_context called with None user_id")
 
 
 def full_model_dump(model):
@@ -34,6 +67,7 @@ class SourceProcessingInput(CommandInput):
     notebook_ids: List[str]
     transformations: List[str]
     embed: bool
+    user_id: Optional[str] = None  # For multitenancy context propagation
 
 
 class SourceProcessingOutput(CommandOutput):
@@ -61,11 +95,21 @@ async def process_source_command(
     input_data: SourceProcessingInput,
 ) -> SourceProcessingOutput:
     """
-    Process source content using the source_graph workflow
+    Process source content using the source_graph workflow.
+
+    Sets user context for multitenancy before processing.
     """
     start_time = time.time()
 
     try:
+        # Set user context for multitenancy
+        set_user_context(input_data.user_id)
+
+        # Provision API keys from database for worker context
+        from open_notebook.ai.key_provider import provision_all_keys
+        await provision_all_keys()
+        logger.debug("Provisioned API keys from database")
+
         logger.info(f"Starting source processing for source: {input_data.source_id}")
         logger.info(f"Notebook IDs: {input_data.notebook_ids}")
         logger.info(f"Transformations: {input_data.transformations}")
@@ -83,6 +127,14 @@ async def process_source_command(
         logger.info(f"Loaded {len(transformations)} transformations")
 
         # 2. Get existing source record to update its command field
+        # Check current user context
+        try:
+            from api.auth import current_user_id
+            logger.info(f"Current user context before Source.get: {current_user_id.get()}")
+        except Exception as e:
+            logger.warning(f"Could not check user context: {e}")
+
+        logger.info(f"Fetching source: {input_data.source_id}")
         source = await Source.get(input_data.source_id)
         if not source:
             raise ValueError(f"Source '{input_data.source_id}' not found")
@@ -147,6 +199,30 @@ async def process_source_command(
             error_message=str(e),
         )
     except Exception as e:
+        # Check for UnsupportedTypeException from content-core (permanent failure)
+        if UnsupportedTypeException is not None and isinstance(
+            e, UnsupportedTypeException
+        ):
+            processing_time = time.time() - start_time
+            logger.error(f"Unsupported file type: {e}")
+            return SourceProcessingOutput(
+                success=False,
+                source_id=input_data.source_id,
+                processing_time=processing_time,
+                error_message=f"Unsupported file type: {e}",
+            )
+        # Check for DoclingConversionError (permanent failure - document couldn't be processed)
+        if DoclingConversionError is not None and isinstance(
+            e, DoclingConversionError
+        ):
+            processing_time = time.time() - start_time
+            logger.error(f"Document conversion failed: {e}")
+            return SourceProcessingOutput(
+                success=False,
+                source_id=input_data.source_id,
+                processing_time=processing_time,
+                error_message=f"Document conversion failed: {e}",
+            )
         # Transient failure - will be retried (surreal-commands logs final failure)
         logger.debug(
             f"Transient error processing source {input_data.source_id}: {e}"
@@ -210,6 +286,11 @@ async def run_transformation_command(
     start_time = time.time()
 
     try:
+        # Provision API keys from database for worker context
+        from open_notebook.ai.key_provider import provision_all_keys
+        await provision_all_keys()
+        logger.debug("Provisioned API keys from database")
+
         logger.info(
             f"Running transformation {input_data.transformation_id} "
             f"on source {input_data.source_id}"

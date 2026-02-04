@@ -9,6 +9,7 @@ from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from api.auth import current_user_id
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import ChatSession, Source
 from open_notebook.exceptions import (
@@ -413,10 +414,21 @@ async def delete_source_chat_session(
 
 
 async def stream_source_chat_response(
-    session_id: str, source_id: str, message: str, model_override: Optional[str] = None
+    session_id: str,
+    source_id: str,
+    message: str,
+    model_override: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream the source chat response as Server-Sent Events."""
     try:
+        # Restore user context for multitenancy (lost during streaming)
+        logger.info(f"stream_source_chat_response: received user_id={user_id}")
+        if user_id:
+            current_user_id.set(user_id)
+            logger.info(f"Restored user context in streaming: {user_id}")
+        else:
+            logger.warning("stream_source_chat_response: No user_id provided, cannot restore context")
         # Get current state
         # Используем sync get_state() в потоке, т.к. SqliteSaver не поддерживает async
         current_state = await asyncio.to_thread(
@@ -439,10 +451,15 @@ async def stream_source_chat_response(
         yield f"data: {json.dumps(user_event)}\n\n"
 
         # Execute source chat graph synchronously (like notebook chat does)
+        # Pass user_id through config for context propagation (needed for model provisioning)
         result = source_chat_graph.invoke(
             input=state_values,  # type: ignore[arg-type]
             config=RunnableConfig(
-                configurable={"thread_id": session_id, "model_id": model_override}
+                configurable={
+                    "thread_id": session_id,
+                    "model_id": model_override,
+                    "user_id": user_id,
+                }
             ),
         )
 
@@ -526,6 +543,10 @@ async def send_message_to_source_chat(
         # Update session timestamp
         await session.save()
 
+        # Capture user_id before streaming (context is lost in streaming)
+        user_id = current_user_id.get()
+        logger.info(f"send_message_to_source_chat: captured user_id={user_id} before streaming")
+
         # Return streaming response
         return StreamingResponse(
             stream_source_chat_response(
@@ -533,6 +554,7 @@ async def send_message_to_source_chat(
                 source_id=full_source_id,
                 message=request.message,
                 model_override=model_override,
+                user_id=str(user_id) if user_id else None,
             ),
             media_type="text/plain",
             headers={

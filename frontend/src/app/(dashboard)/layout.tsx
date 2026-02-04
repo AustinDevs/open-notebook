@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/lib/hooks/use-auth'
+import { useParentNavigationSync } from '@/lib/hooks/use-parent-navigation-sync'
 import { useVersionCheck } from '@/lib/hooks/use-version-check'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -21,6 +22,9 @@ export default function DashboardLayout({
 
   // Check for version updates once per session
   useVersionCheck()
+
+  // Sync navigation to parent window when embedded in iframe
+  useParentNavigationSync()
 
   useEffect(() => {
     // Mark that we've completed the initial auth check

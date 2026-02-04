@@ -17,6 +17,16 @@ from open_notebook.utils import clean_thinking_content
 from open_notebook.utils.context_builder import ContextBuilder
 
 
+def _restore_user_context(user_id: str | None) -> None:
+    """Restore user context in a new event loop/thread for multitenancy."""
+    if user_id:
+        try:
+            from api.auth import current_user_id
+            current_user_id.set(user_id)
+        except ImportError:
+            pass  # api.auth not available in this context
+
+
 class SourceChatState(TypedDict):
     messages: Annotated[list, add_messages]
     source_id: str
@@ -43,12 +53,17 @@ def call_model_with_source_context(
     if not source_id:
         raise ValueError("source_id is required in state")
 
+    # Extract user_id from config for context propagation
+    user_id = config.get("configurable", {}).get("user_id")
+
     # Build source context using ContextBuilder (run async code in new loop)
     def build_context():
         """Build context in a new event loop"""
         new_loop = asyncio.new_event_loop()
         try:
             asyncio.set_event_loop(new_loop)
+            # Restore user context for multitenancy (lost in new loop/thread)
+            _restore_user_context(user_id)
             context_builder = ContextBuilder(
                 source_id=source_id,
                 include_insights=True,
@@ -121,6 +136,8 @@ def call_model_with_source_context(
         new_loop = asyncio.new_event_loop()
         try:
             asyncio.set_event_loop(new_loop)
+            # Restore user context for multitenancy (lost in new loop/thread)
+            _restore_user_context(user_id)
             return new_loop.run_until_complete(
                 provision_langchain_model(
                     str(payload),
@@ -144,16 +161,8 @@ def call_model_with_source_context(
             future = executor.submit(run_in_new_loop)
             model = future.result()
     except RuntimeError:
-        # No event loop running, safe to use asyncio.run()
-        model = asyncio.run(
-            provision_langchain_model(
-                str(payload),
-                config.get("configurable", {}).get("model_id")
-                or state.get("model_override"),
-                "chat",
-                max_tokens=8192,
-            )
-        )
+        # No event loop running, use the same function that restores context
+        model = run_in_new_loop()
 
     ai_message = model.invoke(payload)
 

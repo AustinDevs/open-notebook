@@ -25,6 +25,23 @@ from open_notebook.exceptions import (
     NotFoundError,
 )
 
+
+def get_current_user_id() -> Optional[str]:
+    """
+    Get current user ID from context variable.
+
+    This function is used to retrieve the user_id for row-level multitenancy.
+    It returns None if no user context is set (e.g., in password auth mode
+    or during background jobs without user context).
+    """
+    try:
+        from api.auth import current_user_id
+
+        return current_user_id.get()
+    except ImportError:
+        # api.auth not available (e.g., during migrations or tests)
+        return None
+
 T = TypeVar("T", bound="ObjectModel")
 
 
@@ -34,9 +51,16 @@ class ObjectModel(BaseModel):
     nullable_fields: ClassVar[set[str]] = set()  # Fields that can be saved as None
     created: Optional[datetime] = None
     updated: Optional[datetime] = None
+    user_id: Optional[str] = None  # Row-level multitenancy: owner user ID
 
     @classmethod
     async def get_all(cls: Type[T], order_by=None) -> List[T]:
+        """
+        Fetch all records from the table.
+
+        Row-level multitenancy: If a user context is set, only records
+        belonging to that user (or with no user_id) are returned.
+        """
         try:
             # If called from a specific subclass, use its table_name
             if cls.table_name:
@@ -47,12 +71,31 @@ class ObjectModel(BaseModel):
                 raise InvalidInputError(
                     "get_all() must be called from a specific model class"
                 )
-            if order_by:
-                query = f"SELECT * FROM {table_name} ORDER BY {order_by}"
-            else:
-                query = f"SELECT * FROM {table_name}"
 
-            result = await repo_query(query)
+            # Build query with optional user filtering
+            current_user = get_current_user_id()
+            params: Dict[str, Any] = {}
+
+            if current_user:
+                # Filter by user_id: return records owned by user OR with no owner
+                # Use direct interpolation - safe since current_user comes from validated JWT
+                user_id_str = str(current_user)
+                # Ensure it has the user: prefix
+                if not user_id_str.startswith("user:"):
+                    user_id_str = f"user:{user_id_str}"
+                where_clause = f"WHERE user_id = {user_id_str} OR user_id = NONE"
+                logger.debug(f"get_all: current_user={current_user}, where_clause={where_clause}")
+            else:
+                where_clause = ""
+
+            if order_by:
+                query = f"SELECT * FROM {table_name} {where_clause} ORDER BY {order_by}"
+            else:
+                query = f"SELECT * FROM {table_name} {where_clause}"
+
+            logger.debug(f"get_all query: {query}, params={params}")
+            result = await repo_query(query, params if params else None)
+            logger.debug(f"get_all result count: {len(result) if result else 0}")
             objects = []
             for obj in result:
                 try:
@@ -68,6 +111,12 @@ class ObjectModel(BaseModel):
 
     @classmethod
     async def get(cls: Type[T], id: str) -> T:
+        """
+        Fetch a single record by ID.
+
+        Row-level multitenancy: If a user context is set, only returns the
+        record if it belongs to that user (or has no user_id set).
+        """
         if not id:
             raise InvalidInputError("ID cannot be empty")
         try:
@@ -84,11 +133,35 @@ class ObjectModel(BaseModel):
                     raise InvalidInputError(f"No class found for table {table_name}")
                 target_class = cast(Type[T], found_class)
 
-            result = await repo_query("SELECT * FROM $id", {"id": ensure_record_id(id)})
+            # Use direct interpolation since id is validated above
+            result = await repo_query(f"SELECT * FROM {id}")
             if result:
-                return target_class(**result[0])
+                obj = target_class(**result[0])
+
+                # Check user ownership if user context is set
+                current_user = get_current_user_id()
+                logger.debug(f"ObjectModel.get: current_user={current_user}, obj.user_id={obj.user_id}")
+                if current_user and obj.user_id:
+                    # Normalize user IDs for comparison
+                    obj_user_id = str(obj.user_id)
+                    if ":" in obj_user_id:
+                        obj_user_id = obj_user_id.split(":")[-1]
+                    check_user_id = str(current_user)
+                    if ":" in check_user_id:
+                        check_user_id = check_user_id.split(":")[-1]
+
+                    logger.debug(f"ObjectModel.get: comparing obj_user_id={obj_user_id} vs check_user_id={check_user_id}")
+                    if obj_user_id != check_user_id and not obj_user_id.endswith(
+                        check_user_id
+                    ):
+                        logger.warning(f"ObjectModel.get: ownership check failed for {id}")
+                        raise NotFoundError(f"{table_name} with id {id} not found")
+
+                return obj
             else:
                 raise NotFoundError(f"{table_name} with id {id} not found")
+        except NotFoundError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching object with id {id}: {str(e)}")
             logger.exception(e)
@@ -117,8 +190,17 @@ class ObjectModel(BaseModel):
         Note: Embedding is no longer generated inline. Subclasses that need
         embedding should override save() to submit the appropriate embed_*
         command after calling super().save().
+
+        Row-level multitenancy: If user_id is not set and a user context exists,
+        the user_id will be automatically set from the current user context.
         """
         try:
+            # Auto-set user_id from context if not already set
+            if self.user_id is None:
+                context_user_id = get_current_user_id()
+                if context_user_id:
+                    self.user_id = context_user_id
+
             self.model_validate(self.model_dump(), strict=True)
             data = self._prepare_save_data()
             data["updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -160,7 +242,28 @@ class ObjectModel(BaseModel):
             raise DatabaseOperationError(e)
 
     def _prepare_save_data(self) -> Dict[str, Any]:
+        from surrealdb import RecordID
+        import re
         data = self.model_dump()
+        # Convert user_id to RecordID for database schema compliance
+        # RecordID("user", int) creates clean format, RecordID("user", str) creates escaped format
+        if data.get("user_id"):
+            user_id_val = data["user_id"]
+            if isinstance(user_id_val, RecordID):
+                pass  # Already a RecordID, leave it
+            elif isinstance(user_id_val, str):
+                # Extract numeric ID from various formats: "user:1", "1", "user:⟨1⟩", "user:`1`"
+                match = re.search(r"(\d+)", user_id_val)
+                if match:
+                    # Use int to create clean RecordID format (user:1 not user:⟨1⟩)
+                    data["user_id"] = RecordID("user", int(match.group(1)))
+                else:
+                    # Non-numeric ID, use string (will be escaped but that's ok for non-numeric)
+                    id_part = user_id_val.split(":")[-1] if ":" in user_id_val else user_id_val
+                    data["user_id"] = RecordID("user", id_part)
+            else:
+                # Convert other types to RecordID
+                data["user_id"] = RecordID("user", int(user_id_val) if str(user_id_val).isdigit() else str(user_id_val))
         return {
             key: value
             for key, value in data.items()
@@ -249,10 +352,8 @@ class RecordModel(BaseModel):
     async def _load_from_db(self):
         """Load data from database if not already loaded"""
         if not getattr(self, "_db_loaded", False):
-            result = await repo_query(
-                "SELECT * FROM ONLY $record_id",
-                {"record_id": ensure_record_id(self.record_id)},
-            )
+            # Use direct interpolation since record_id is from class definition
+            result = await repo_query(f"SELECT * FROM ONLY {self.record_id}")
 
             # Handle case where record doesn't exist yet
             if result:
@@ -303,9 +404,8 @@ class RecordModel(BaseModel):
             data,
         )
 
-        result = await repo_query(
-            "SELECT * FROM $record_id", {"record_id": ensure_record_id(self.record_id)}
-        )
+        # Use direct interpolation since record_id is from class definition
+        result = await repo_query(f"SELECT * FROM {self.record_id}")
         if result:
             for key, value in result[0].items():
                 if hasattr(self, key):

@@ -1,8 +1,9 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from loguru import logger
 
+from api.auth import current_user_id
 from api.models import (
     NotebookCreate,
     NotebookDeletePreview,
@@ -17,6 +18,30 @@ from open_notebook.exceptions import InvalidInputError
 router = APIRouter()
 
 
+def get_user_filter_clause() -> tuple[str, Dict[str, Any]]:
+    """
+    Get SQL WHERE clause and params for user filtering.
+
+    Returns a tuple of (clause, params) where clause is either:
+    - "" (empty string) if no user context
+    - "WHERE user_id = user:X OR user_id = NONE" if user context exists
+
+    Note: Uses direct interpolation since SurrealDB parameter binding
+    doesn't work correctly with RecordID in WHERE clauses.
+    """
+    user_id = current_user_id.get()
+    if user_id:
+        # Use direct interpolation - safe since user_id comes from validated JWT
+        user_id_str = str(user_id)
+        if not user_id_str.startswith("user:"):
+            user_id_str = f"user:{user_id_str}"
+        return (
+            f"WHERE user_id = {user_id_str} OR user_id = NONE",
+            {},
+        )
+    return ("", {})
+
+
 @router.get("/notebooks", response_model=List[NotebookResponse])
 async def get_notebooks(
     archived: Optional[bool] = Query(None, description="Filter by archived status"),
@@ -24,16 +49,20 @@ async def get_notebooks(
 ):
     """Get all notebooks with optional filtering and ordering."""
     try:
-        # Build the query with counts
+        # Get user filter clause for multitenancy
+        user_clause, user_params = get_user_filter_clause()
+
+        # Build the query with counts and user filtering
         query = f"""
             SELECT *,
             count(<-reference.in) as source_count,
             count(<-artifact.in) as note_count
             FROM notebook
+            {user_clause}
             ORDER BY {order_by}
         """
 
-        result = await repo_query(query)
+        result = await repo_query(query, user_params if user_params else None)
 
         # Filter by archived status if specified
         if archived is not None:

@@ -12,10 +12,11 @@ is set. If not set, keys are stored as plain text with a warning logged.
 from datetime import datetime
 from typing import ClassVar, Dict, List, Optional
 
+from loguru import logger
 from pydantic import Field, SecretStr, field_validator
 
-from open_notebook.database.repository import ensure_record_id, repo_query, repo_upsert
-from open_notebook.domain.base import RecordModel
+from open_notebook.database.repository import repo_query, repo_upsert
+from open_notebook.domain.base import RecordModel, get_current_user_id
 from open_notebook.utils.encryption import decrypt_value, encrypt_value
 
 
@@ -174,10 +175,14 @@ class ProviderCredential:
 
 class ProviderConfig(RecordModel):
     """
-    Singleton configuration for multiple provider credentials.
+    Per-user configuration for multiple provider credentials.
 
-    Uses RecordModel pattern with a fixed record_id. Stores a dictionary
-    of ProviderCredential objects organized by provider name.
+    Supports multitenancy: each user has isolated provider configs.
+    In password auth mode (no user context), falls back to global config.
+
+    Record ID pattern:
+    - JWT mode: "provider_config:{user_id}" (per-user)
+    - Password mode: "open_notebook:provider_configs" (global)
 
     Usage:
         config = await ProviderConfig.get_instance()
@@ -185,6 +190,7 @@ class ProviderConfig(RecordModel):
         default = config.get_default_config("openai")
     """
 
+    # Default record_id for backwards compatibility (password auth mode)
     record_id: ClassVar[str] = "open_notebook:provider_configs"
 
     # Store credentials organized by provider name
@@ -195,20 +201,43 @@ class ProviderConfig(RecordModel):
     )
 
     @classmethod
+    def _get_record_id_for_user(cls, user_id: Optional[str] = None) -> str:
+        """
+        Get record ID for user, or global fallback for password auth.
+
+        Args:
+            user_id: User ID from context (e.g., "user:abc123" or "abc123")
+
+        Returns:
+            Per-user record ID ("provider_config:{user_id}") or
+            global record ID ("open_notebook:provider_configs")
+        """
+        if user_id:
+            # Normalize user_id - extract just the ID part if full record format
+            user_id_part = user_id.split(":")[-1] if ":" in user_id else user_id
+            return f"provider_config:{user_id_part}"
+        # Fallback for password auth mode (no user context)
+        return "open_notebook:provider_configs"
+
+    @classmethod
     async def get_instance(cls) -> "ProviderConfig":
         """
-        Always fetch fresh configuration from database.
+        Always fetch fresh configuration from database for current user.
 
-        Overrides parent caching behavior to ensure we always get the latest
-        configuration values, similar to APIKeyConfig pattern.
+        Multitenancy support:
+        - JWT mode: Returns per-user config from "provider_config:{user_id}"
+        - Password mode: Returns global config from "open_notebook:provider_configs"
 
         Returns:
             ProviderConfig: Fresh instance with current database values
         """
-        result = await repo_query(
-            "SELECT * FROM ONLY $record_id",
-            {"record_id": ensure_record_id(cls.record_id)},
-        )
+        # Get user-specific record_id
+        user_id = get_current_user_id()
+        record_id = cls._get_record_id_for_user(user_id)
+
+        logger.debug(f"ProviderConfig.get_instance: user_id={user_id}, record_id={record_id}")
+        # Use direct interpolation since record_id is from controlled _get_record_id_for_user()
+        result = await repo_query(f"SELECT * FROM ONLY {record_id}")
 
         if result:
             if isinstance(result, list) and len(result) > 0:
@@ -408,15 +437,27 @@ class ProviderConfig(RecordModel):
 
         return False
 
-    def _prepare_save_data(self) -> dict:
+    def _prepare_save_data(self, user_id: Optional[str] = None) -> dict:
         """
-        Prepare data for database storage.
+        Prepare data for database storage, including user_id for multitenancy.
 
         SecretStr values are extracted, encrypted, and stored as strings.
         Encryption is performed using Fernet symmetric encryption if
         OPEN_NOTEBOOK_ENCRYPTION_KEY is configured.
+
+        Args:
+            user_id: User ID to include in saved data for explicit ownership.
+                    Format: "user:abc123" or "abc123" (will be normalized)
         """
         data = {"credentials": {}}
+
+        # Add explicit user_id for multitenancy (referential integrity)
+        if user_id:
+            # Normalize to full record format "user:{id}"
+            if ":" not in user_id:
+                data["user_id"] = f"user:{user_id}"
+            else:
+                data["user_id"] = user_id
 
         for provider, credentials in self.credentials.items():
             data["credentials"][provider] = []
@@ -428,17 +469,46 @@ class ProviderConfig(RecordModel):
 
     async def save(self) -> "ProviderConfig":
         """
-        Save the configuration to the database.
+        Save the configuration to the database for current user.
 
-        Uses _prepare_save_data() to properly handle SecretStr conversion
-        and encryption.
+        Multitenancy support:
+        - JWT mode: Saves to "provider_config:{user_id}" with explicit user_id field
+        - Password mode: Saves to "open_notebook:provider_configs" (no user_id field)
+
+        Uses _prepare_save_data() to properly handle SecretStr conversion,
+        encryption, and user_id inclusion for referential integrity.
         """
-        data = self._prepare_save_data()
-        await repo_upsert("open_notebook", self.record_id, data)
+        # Get user-specific record_id
+        user_id = get_current_user_id()
+        record_id = self._get_record_id_for_user(user_id)
+
+        # Determine table name from record_id
+        table_name = record_id.split(":")[0]
+
+        # Pass user_id to include in saved data for multitenancy
+        data = self._prepare_save_data(user_id)
+        await repo_upsert(table_name, record_id, data)
         return self
 
     @classmethod
-    def _clear_for_test(cls) -> None:
-        """Clear the singleton instance for testing purposes."""
-        if cls.record_id in cls._instances:
-            del cls._instances[cls.record_id]
+    def _clear_for_test(cls, user_id: Optional[str] = None) -> None:
+        """
+        Clear singleton instance(s) for testing purposes.
+
+        Args:
+            user_id: If provided, clears only the instance for that user.
+                     If None, clears all ProviderConfig instances (global + per-user).
+        """
+        if user_id:
+            # Clear specific user's instance
+            record_id = cls._get_record_id_for_user(user_id)
+            if record_id in cls._instances:
+                del cls._instances[record_id]
+        else:
+            # Clear all ProviderConfig instances (global + per-user)
+            keys_to_delete = [
+                key for key in cls._instances.keys()
+                if key == "open_notebook:provider_configs" or key.startswith("provider_config:")
+            ]
+            for key in keys_to_delete:
+                del cls._instances[key]

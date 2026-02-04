@@ -152,9 +152,13 @@ async def get_config(request: Request):
     if db_status == "offline":
         logger.warning(f"Database offline: {db_health.get('error', 'Unknown error')}")
 
+    # Get auth mode
+    auth_mode = os.environ.get("AUTH_MODE", "password")
+
     return {
         "version": current_version,
         "latestVersion": latest_version,
         "hasUpdate": has_update,
         "dbStatus": db_status,
+        "authMode": auth_mode,
     }

@@ -1,10 +1,11 @@
 import json
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
+from api.auth import current_user_id
 from api.models import AskRequest, AskResponse, SearchRequest, SearchResponse
 from open_notebook.ai.models import Model, model_manager
 from open_notebook.domain.notebook import text_search, vector_search
@@ -59,10 +60,19 @@ async def search_knowledge_base(search_request: SearchRequest):
 
 
 async def stream_ask_response(
-    question: str, strategy_model: Model, answer_model: Model, final_answer_model: Model
+    question: str,
+    strategy_model: Model,
+    answer_model: Model,
+    final_answer_model: Model,
+    user_id: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream the ask response as Server-Sent Events."""
     try:
+        # Restore user context for multitenancy (lost during streaming)
+        if user_id:
+            current_user_id.set(user_id)
+            logger.debug(f"Restored user context in ask streaming: {user_id}")
+
         final_answer = None
 
         async for chunk in ask_graph.astream(
@@ -139,10 +149,17 @@ async def ask_knowledge_base(ask_request: AskRequest):
                 detail="Ask feature requires an embedding model. Please configure one in the Models section.",
             )
 
+        # Capture user_id before streaming (context is lost in streaming)
+        user_id = current_user_id.get()
+
         # For streaming response
         return StreamingResponse(
             stream_ask_response(
-                ask_request.question, strategy_model, answer_model, final_answer_model
+                ask_request.question,
+                strategy_model,
+                answer_model,
+                final_answer_model,
+                user_id=str(user_id) if user_id else None,
             ),
             media_type="text/plain",
         )

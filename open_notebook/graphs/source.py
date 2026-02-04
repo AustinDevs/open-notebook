@@ -32,6 +32,9 @@ class TransformationState(TypedDict):
 
 
 async def content_process(state: SourceState) -> dict:
+    import os
+    import tempfile
+
     content_settings = ContentSettings(
         default_content_processing_engine_doc="auto",
         default_content_processing_engine_url="auto",
@@ -49,7 +52,39 @@ async def content_process(state: SourceState) -> dict:
             "ja",
         ],
     )
-    content_state: Dict[str, Any] = state["content_state"]  # type: ignore[assignment]
+    # Make a copy of content_state to avoid mutating the original (important for retries)
+    content_state: Dict[str, Any] = dict(state["content_state"])  # type: ignore[assignment]
+
+    # Store original S3 path and filename before processing (content-core needs local file)
+    original_file_path = content_state.get("file_path")
+    original_filename = None
+    temp_file_path = None
+
+    # If file_path is an S3 URI, download to temp file for content-core processing
+    if original_file_path and original_file_path.startswith("s3://"):
+        try:
+            from open_notebook.utils.storage import download_file
+
+            # Extract original filename from S3 key (e.g., s3://bucket/uploads/1/file.pdf -> file.pdf)
+            original_filename = os.path.basename(original_file_path)
+            file_ext = os.path.splitext(original_filename)[-1] or ".tmp"
+
+            logger.info(f"Downloading S3 file: {original_file_path}")
+            # Download S3 file to temp location
+            file_content = download_file(original_file_path)
+            logger.info(f"Downloaded {len(file_content)} bytes from S3")
+
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=file_ext
+            ) as tmp_file:
+                tmp_file.write(file_content)
+                temp_file_path = tmp_file.name
+
+            logger.info(f"Saved S3 file to temp: {temp_file_path}")
+            content_state["file_path"] = temp_file_path
+        except Exception as e:
+            logger.error(f"Failed to download S3 file for processing: {e}")
+            raise
 
     content_state["url_engine"] = (
         content_settings.default_content_processing_engine_url or "auto"
@@ -75,7 +110,31 @@ async def content_process(state: SourceState) -> dict:
         logger.warning(f"Failed to retrieve speech-to-text model configuration: {e}")
         # Continue without custom audio model (content-core will use its default)
 
-    processed_state = await extract_content(content_state)
+    try:
+        logger.info(f"Starting content extraction for: {content_state.get('file_path', content_state.get('url', 'unknown'))}")
+        processed_state = await extract_content(content_state)
+        logger.info(f"Content extraction complete, title: {getattr(processed_state, 'title', 'N/A')}")
+    finally:
+        # Clean up temp file if we created one
+        if temp_file_path:
+            try:
+                os.unlink(temp_file_path)
+                logger.debug(f"Cleaned up temp file: {temp_file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temp file {temp_file_path}: {e}")
+
+    # Restore original S3 path in processed state for storage in database
+    if original_file_path and original_file_path.startswith("s3://"):
+        processed_state.file_path = original_file_path
+        # Use original filename as title if content-core set it to temp filename
+        if original_filename and (
+            not processed_state.title
+            or processed_state.title.startswith("tmp")
+            or "tmp" in processed_state.title.lower()
+        ):
+            # Remove extension for cleaner title
+            processed_state.title = os.path.splitext(original_filename)[0]
+
     return {"content_state": processed_state}
 
 

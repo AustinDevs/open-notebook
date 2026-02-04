@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/hooks/use-auth'
+import { useConfig } from '@/lib/hooks/use-config'
 import { useSidebarStore } from '@/lib/stores/sidebar-store'
 import { useCreateDialogs } from '@/lib/hooks/use-create-dialogs'
 import {
@@ -81,8 +82,12 @@ export function AppSidebar() {
   const navigation = getNavigation(t)
   const pathname = usePathname()
   const { logout } = useAuth()
+  const { config } = useConfig()
   const { isCollapsed, toggleCollapse } = useSidebarStore()
   const { openSourceDialog, openNotebookDialog, openPodcastDialog } = useCreateDialogs()
+
+  // Hide logout button in JWT auth mode (logout is handled by parent SaaS app)
+  const showLogout = config?.authMode !== 'jwt'
 
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const [isMac, setIsMac] = useState(true) // Default to Mac for SSR
@@ -349,30 +354,32 @@ export function AppSidebar() {
             )}
           </div>
 
-          {isCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-center sidebar-menu-item"
-                  onClick={logout}
-                  aria-label={t.common.signOut}
-                >
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-               <TooltipContent side="right">{t.common.signOut}</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 sidebar-menu-item"
-              onClick={logout}
-              aria-label={t.common.signOut}
-             >
-              <LogOut className="h-4 w-4" />
-              {t.common.signOut}
-            </Button>
+          {showLogout && (
+            isCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center sidebar-menu-item"
+                    onClick={logout}
+                    aria-label={t.common.signOut}
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                 <TooltipContent side="right">{t.common.signOut}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3 sidebar-menu-item"
+                onClick={logout}
+                aria-label={t.common.signOut}
+               >
+                <LogOut className="h-4 w-4" />
+                {t.common.signOut}
+              </Button>
+            )
           )}
         </div>
       </div>
