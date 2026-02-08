@@ -15,11 +15,7 @@ from open_notebook.config import (
     AWS_USE_PATH_STYLE_ENDPOINT,
 )
 from open_notebook.domain.s3_config import S3Config
-from open_notebook.utils.storage import (
-    _reset_s3_client,
-    set_s3_credentials_cache,
-    test_s3_connection_with_credentials,
-)
+from open_notebook.utils.storage import test_s3_connection_with_credentials
 
 router = APIRouter()
 
@@ -142,17 +138,6 @@ async def save_s3_config(request: S3ConfigRequest):
         config.use_path_style = request.use_path_style
 
         await config.update()
-
-        # Cache credentials for use by sync storage functions
-        set_s3_credentials_cache({
-            "access_key_id": request.access_key_id,
-            "secret_access_key": request.secret_access_key,
-            "bucket": request.bucket_name,
-            "region": request.region or "us-east-1",
-            "endpoint": request.endpoint_url,
-            "use_path_style": request.use_path_style,
-            "public_url": request.public_url,
-        })
 
         logger.info(f"S3 configuration saved for bucket: {request.bucket_name}")
 

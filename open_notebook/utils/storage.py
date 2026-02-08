@@ -27,52 +27,25 @@ from open_notebook.config import (
     sanitize_user_id_for_path,
 )
 
-# Lazy-load boto3 only when S3 is enabled
-_s3_client = None
-# Cached credentials (set from async context, used by sync code)
-_cached_credentials: Optional[dict] = None
-
-
-def set_s3_credentials_cache(credentials: Optional[dict]) -> None:
-    """
-    Set the S3 credentials cache.
-
-    Called from async context (e.g., API startup or config update) to make
-    credentials available to sync storage functions.
-    """
-    global _cached_credentials, _s3_client
-    _cached_credentials = credentials
-    # Reset client to pick up new credentials
-    _s3_client = None
-    if credentials:
-        logger.debug(f"S3 credentials cached for bucket: {credentials.get('bucket')}")
-    else:
-        logger.debug("S3 credentials cache cleared")
-
-
 def _get_s3_credentials() -> Optional[dict]:
     """
-    Get S3 credentials from cache, database config, or environment variables.
+    Get S3 credentials from database config (per-user) or environment variables.
     Returns None if S3 is not configured.
 
+    In multitenancy mode, each user has their own S3 configuration stored in the
+    database. The S3Config.get_sync() method uses the current user context.
+
     Priority:
-    1. Cached credentials (set from async context)
-    2. Database config via S3Config.get_sync() (only works in sync context)
-    3. Environment variables
+    1. Database config via S3Config.get_sync() (per-user in multitenancy)
+    2. Environment variables (fallback for existing deployments)
     """
-    global _cached_credentials
-
-    # First, check cache (set from async context)
-    if _cached_credentials is not None:
-        return _cached_credentials
-
-    # Try to get credentials from database (only works in sync context)
+    # Try to get credentials from database (per-user in multitenancy mode)
     try:
         from open_notebook.domain.s3_config import S3Config
 
         config = S3Config.get_sync()
         if config and config.bucket_name and config.access_key_id:
-            credentials = {
+            return {
                 "access_key_id": config.access_key_id.get_secret_value()
                 if config.access_key_id
                 else None,
@@ -85,9 +58,6 @@ def _get_s3_credentials() -> Optional[dict]:
                 "use_path_style": config.use_path_style,
                 "public_url": config.public_url,
             }
-            # Cache for future use
-            _cached_credentials = credentials
-            return credentials
     except Exception as e:
         # Database config not available or error - fall back to env vars
         logger.debug(f"S3Config not available from database: {e}")
@@ -108,9 +78,12 @@ def _get_s3_credentials() -> Optional[dict]:
 
 
 def _get_s3_client():
-    """Get or create S3 client (lazy initialization)."""
-    global _s3_client
+    """
+    Create S3 client with current user's credentials.
 
+    No caching - creates a fresh client each time to support multitenancy
+    where each user may have different S3 credentials.
+    """
     credentials = _get_s3_credentials()
     if not credentials:
         raise RuntimeError("S3 is not configured")
@@ -129,7 +102,7 @@ def _get_s3_client():
             },
         )
 
-        _s3_client = boto3.client(
+        return boto3.client(
             "s3",
             endpoint_url=credentials.get("endpoint") or None,
             aws_access_key_id=credentials.get("access_key_id"),
@@ -137,18 +110,12 @@ def _get_s3_client():
             region_name=credentials.get("region"),
             config=config,
         )
-        return _s3_client
     except ImportError:
         raise RuntimeError(
             "boto3 is required for S3 storage. Install with: pip install boto3"
         )
 
 
-def _reset_s3_client():
-    """Reset the cached S3 client and credentials (used when config changes)."""
-    global _s3_client, _cached_credentials
-    _s3_client = None
-    _cached_credentials = None
 
 
 def _get_s3_key(relative_path: str) -> str:

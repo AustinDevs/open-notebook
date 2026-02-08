@@ -108,31 +108,9 @@ async def lifespan(app: FastAPI):
         # Fail fast - don't start the API with an outdated database schema
         raise RuntimeError(f"Failed to run database migrations: {str(e)}") from e
 
-    # Initialize S3 credentials cache from database config
-    try:
-        from open_notebook.domain.s3_config import S3Config
-        from open_notebook.utils.storage import set_s3_credentials_cache
-
-        s3_config = await S3Config.get_instance()
-        if s3_config.is_configured():
-            set_s3_credentials_cache({
-                "access_key_id": s3_config.access_key_id.get_secret_value()
-                if s3_config.access_key_id
-                else None,
-                "secret_access_key": s3_config.secret_access_key.get_secret_value()
-                if s3_config.secret_access_key
-                else None,
-                "bucket": s3_config.bucket_name,
-                "region": s3_config.region or "us-east-1",
-                "endpoint": s3_config.endpoint_url,
-                "use_path_style": s3_config.use_path_style,
-                "public_url": s3_config.public_url,
-            })
-            logger.info(f"S3 storage configured from database: {s3_config.bucket_name}")
-        else:
-            logger.info("S3 storage not configured in database, using environment variables if set")
-    except Exception as e:
-        logger.warning(f"Could not initialize S3 config cache: {e}")
+    # S3 storage is configured per-user in multitenancy mode
+    # Credentials are fetched on-demand via S3Config.get_instance() in storage module
+    logger.info("S3 storage: per-user config from database, fallback to environment variables")
 
     logger.success("API initialization completed successfully")
 
