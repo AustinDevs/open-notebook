@@ -134,7 +134,6 @@ async def convert_pdf_to_images(
                 continue
 
             # Find the output file (pdftoppm adds page number suffix)
-            output_pattern = f"{output_prefix}*.png"
             output_files = list(Path(output_dir).glob(f"page_{page_num:04d}*.png"))
             if output_files:
                 results.append((str(output_files[0]), page_num))
@@ -189,7 +188,6 @@ async def convert_office_to_pdf(file_path: str) -> str:
             raise RuntimeError(f"LibreOffice conversion failed: {stderr.decode()}")
 
         # Find the output PDF (LibreOffice names it based on input filename)
-        input_stem = Path(file_path).stem
         pdf_files = list(Path(output_dir).glob("*.pdf"))
 
         if not pdf_files:
