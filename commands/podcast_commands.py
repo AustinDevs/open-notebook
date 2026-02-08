@@ -1,3 +1,4 @@
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -9,6 +10,7 @@ from surreal_commands import CommandInput, CommandOutput, command
 from open_notebook.config import DATA_FOLDER
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.podcasts.models import EpisodeProfile, PodcastEpisode, SpeakerProfile
+from open_notebook.utils.storage import is_s3_enabled, upload_file
 
 try:
     from podcast_creator import configure, create_podcast
@@ -137,9 +139,36 @@ async def generate_podcast_command(
             episode_profile=episode_profile.name,
         )
 
-        episode.audio_file = (
+        # Get the local audio file path
+        local_audio_path = (
             str(result.get("final_output_file_path")) if result else None
         )
+
+        # Upload to S3 if enabled
+        audio_file_path = local_audio_path
+        if local_audio_path and is_s3_enabled():
+            try:
+                logger.info(f"Uploading podcast audio to S3: {local_audio_path}")
+                with open(local_audio_path, "rb") as f:
+                    audio_file_path = upload_file(
+                        f, local_audio_path, content_type="audio/mpeg"
+                    )
+                logger.info(f"Uploaded podcast audio to S3: {audio_file_path}")
+
+                # Clean up local file after successful S3 upload
+                try:
+                    os.unlink(local_audio_path)
+                    logger.debug(f"Cleaned up local audio file: {local_audio_path}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to clean up local audio file {local_audio_path}: {e}"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to upload audio to S3: {e}")
+                # Keep local path if S3 upload fails
+                audio_file_path = local_audio_path
+
+        episode.audio_file = audio_file_path
         episode.transcript = {
             "transcript": full_model_dump(result["transcript"]) if result else None
         }

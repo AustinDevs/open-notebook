@@ -12,7 +12,7 @@ from fastapi import (
     Query,
     UploadFile,
 )
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from loguru import logger
 from surreal_commands import execute_command_sync, submit_command
 
@@ -29,11 +29,18 @@ from api.models import (
     SourceUpdate,
 )
 from commands.source_commands import SourceProcessingInput
-from open_notebook.config import UPLOADS_FOLDER
+from open_notebook.config import DATA_FOLDER, UPLOADS_FOLDER
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import Notebook, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import InvalidInputError
+from open_notebook.utils.storage import (
+    delete_file,
+    file_exists,
+    get_file_stream,
+    is_s3_enabled,
+    upload_file as storage_upload_file,
+)
 
 router = APIRouter()
 
@@ -61,27 +68,31 @@ def generate_unique_filename(original_filename: str, upload_folder: str) -> str:
         counter += 1
 
 
-async def save_uploaded_file(upload_file: UploadFile) -> str:
-    """Save uploaded file to uploads folder and return file path."""
-    if not upload_file.filename:
+async def save_uploaded_file(uploaded_file: UploadFile) -> str:
+    """Save uploaded file to uploads folder (local or S3) and return file path."""
+    if not uploaded_file.filename:
         raise ValueError("No filename provided")
 
-    # Generate unique filename
-    file_path = generate_unique_filename(upload_file.filename, UPLOADS_FOLDER)
+    # Generate unique filename for local path (used even for S3 as base path)
+    local_path = generate_unique_filename(uploaded_file.filename, UPLOADS_FOLDER)
 
     try:
-        # Save file
-        with open(file_path, "wb") as f:
-            content = await upload_file.read()
-            f.write(content)
+        # Read file content
+        content = await uploaded_file.read()
 
-        logger.info(f"Saved uploaded file to: {file_path}")
-        return file_path
+        # Detect content type from file
+        content_type = uploaded_file.content_type
+
+        # Upload to storage (S3 or local based on config)
+        storage_path = storage_upload_file(content, local_path, content_type)
+
+        logger.info(f"Saved uploaded file to: {storage_path}")
+        return storage_path
     except Exception as e:
         logger.error(f"Failed to save uploaded file: {e}")
-        # Clean up partial file if it exists
-        if os.path.exists(file_path):
-            os.unlink(file_path)
+        # Clean up partial file if it exists (local only)
+        if os.path.exists(local_path):
+            os.unlink(local_path)
         raise
 
 
@@ -417,7 +428,7 @@ async def create_source(
                 # Clean up uploaded file if we created it
                 if file_path and upload_file:
                     try:
-                        os.unlink(file_path)
+                        delete_file(file_path)
                     except Exception:
                         pass
                 raise HTTPException(
@@ -474,7 +485,7 @@ async def create_source(
                     # Clean up uploaded file if we created it
                     if file_path and upload_file:
                         try:
-                            os.unlink(file_path)
+                            delete_file(file_path)
                         except Exception:
                             pass
                     raise HTTPException(
@@ -519,7 +530,7 @@ async def create_source(
                 # Clean up uploaded file if we created it
                 if file_path and upload_file:
                     try:
-                        os.unlink(file_path)
+                        delete_file(file_path)
                     except Exception:
                         pass
                 raise
@@ -528,7 +539,7 @@ async def create_source(
         # Clean up uploaded file on HTTP exceptions if we created it
         if file_path and upload_file:
             try:
-                os.unlink(file_path)
+                delete_file(file_path)
             except Exception:
                 pass
         raise
@@ -536,7 +547,7 @@ async def create_source(
         # Clean up uploaded file on validation errors if we created it
         if file_path and upload_file:
             try:
-                os.unlink(file_path)
+                delete_file(file_path)
             except Exception:
                 pass
         raise HTTPException(status_code=400, detail=str(e))
@@ -545,7 +556,7 @@ async def create_source(
         # Clean up uploaded file on unexpected errors if we created it
         if file_path and upload_file:
             try:
-                os.unlink(file_path)
+                delete_file(file_path)
             except Exception:
                 pass
         raise HTTPException(status_code=500, detail=f"Error creating source: {str(e)}")
@@ -559,40 +570,72 @@ async def create_source_json(source_data: SourceCreate):
     return await create_source(form_data)
 
 
-async def _resolve_source_file(source_id: str) -> tuple[str, str]:
+async def _resolve_source_file(source_id: str) -> tuple[str, str, bool]:
+    """
+    Resolve source file path and check if it exists.
+
+    Returns:
+        Tuple of (storage_path, filename, is_s3)
+    """
     source = await Source.get(source_id)
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    file_path = source.asset.file_path if source.asset else None
-    if not file_path:
+    storage_path = source.asset.file_path if source.asset else None
+    if not storage_path:
         raise HTTPException(status_code=404, detail="Source has no file to download")
 
-    safe_root = os.path.realpath(UPLOADS_FOLDER)
-    resolved_path = os.path.realpath(file_path)
+    # Check if it's an S3 path
+    is_s3 = storage_path.startswith("s3://")
 
-    if not resolved_path.startswith(safe_root):
-        logger.warning(
-            f"Blocked download outside uploads directory for source {source_id}: {resolved_path}"
-        )
-        raise HTTPException(status_code=403, detail="Access to file denied")
+    if is_s3:
+        # For S3, extract filename from path
+        filename = storage_path.split("/")[-1]
+        # Check if file exists in S3
+        if not file_exists(storage_path):
+            raise HTTPException(status_code=404, detail="File not found in storage")
+    else:
+        # For local files, validate path security
+        safe_root = os.path.realpath(UPLOADS_FOLDER)
+        # Also allow files in DATA_FOLDER (for backwards compatibility)
+        data_root = os.path.realpath(DATA_FOLDER)
+        resolved_path = os.path.realpath(storage_path)
 
-    if not os.path.exists(resolved_path):
-        raise HTTPException(status_code=404, detail="File not found on server")
+        if not (
+            resolved_path.startswith(safe_root) or resolved_path.startswith(data_root)
+        ):
+            logger.warning(
+                f"Blocked download outside allowed directories for source {source_id}: {resolved_path}"
+            )
+            raise HTTPException(status_code=403, detail="Access to file denied")
 
-    filename = os.path.basename(resolved_path)
-    return resolved_path, filename
+        if not os.path.exists(resolved_path):
+            raise HTTPException(status_code=404, detail="File not found on server")
+
+        filename = os.path.basename(resolved_path)
+        storage_path = resolved_path
+
+    return storage_path, filename, is_s3
 
 
 def _is_source_file_available(source: Source) -> Optional[bool]:
     if not source or not source.asset or not source.asset.file_path:
         return None
 
-    file_path = source.asset.file_path
-    safe_root = os.path.realpath(UPLOADS_FOLDER)
-    resolved_path = os.path.realpath(file_path)
+    storage_path = source.asset.file_path
 
-    if not resolved_path.startswith(safe_root):
+    # Check if it's an S3 path
+    if storage_path.startswith("s3://"):
+        return file_exists(storage_path)
+
+    # For local files, validate path security
+    safe_root = os.path.realpath(UPLOADS_FOLDER)
+    data_root = os.path.realpath(DATA_FOLDER)
+    resolved_path = os.path.realpath(storage_path)
+
+    if not (
+        resolved_path.startswith(safe_root) or resolved_path.startswith(data_root)
+    ):
         return False
 
     return os.path.exists(resolved_path)
@@ -675,12 +718,23 @@ async def check_source_file(source_id: str):
 async def download_source_file(source_id: str):
     """Download the original file associated with an uploaded source."""
     try:
-        resolved_path, filename = await _resolve_source_file(source_id)
-        return FileResponse(
-            path=resolved_path,
-            filename=filename,
-            media_type="application/octet-stream",
-        )
+        storage_path, filename, is_s3 = await _resolve_source_file(source_id)
+
+        if is_s3:
+            # Stream from S3
+            file_stream = get_file_stream(storage_path)
+            return StreamingResponse(
+                file_stream,
+                media_type="application/octet-stream",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        else:
+            # Serve local file
+            return FileResponse(
+                path=storage_path,
+                filename=filename,
+                media_type="application/octet-stream",
+            )
     except HTTPException:
         raise
     except Exception as e:
@@ -919,11 +973,23 @@ async def retry_source_processing(source_id: str):
 
 @router.delete("/sources/{source_id}")
 async def delete_source(source_id: str):
-    """Delete a source."""
+    """Delete a source and its associated file (if any)."""
     try:
         source = await Source.get(source_id)
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
+
+        # Delete the associated file if it exists
+        if source.asset and source.asset.file_path:
+            storage_path = source.asset.file_path
+            try:
+                if delete_file(storage_path):
+                    logger.info(f"Deleted file for source {source_id}: {storage_path}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to delete file for source {source_id}: {storage_path} - {e}"
+                )
+                # Continue with source deletion even if file deletion fails
 
         await source.delete()
 
