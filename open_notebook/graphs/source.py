@@ -1,5 +1,6 @@
 import asyncio
 import operator
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,6 +22,7 @@ from open_notebook.utils.pdf import (
     convert_office_to_pdf,
     convert_pdf_to_images,
 )
+from open_notebook.utils.storage import download_to_temp_file
 from open_notebook.utils.video import (
     calculate_frame_params,
     cleanup_temp_files,
@@ -209,8 +211,9 @@ async def process_video_content(content_state: dict, file_path: str) -> dict:
             logger.warning("No vision model configured, skipping frame analysis")
 
         # 6. Synthesize all content
+        # Get synthesis model if we have any content to synthesize (frames OR transcript)
         synthesis_model = None
-        if frame_descriptions and transcript:
+        if frame_descriptions or transcript:
             chat_model = await model_manager.get_default_model("chat")
             if chat_model:
                 synthesis_model = chat_model.to_langchain()
@@ -597,6 +600,20 @@ async def content_process(state: SourceState) -> dict:
     )
     content_state["output_format"] = "markdown"
 
+    # Handle S3 files - download to temp file for processing
+    original_s3_path = None
+    temp_file_path = None
+    file_path = content_state.get("file_path")
+
+    if file_path and file_path.startswith("s3://"):
+        logger.debug(f"Downloading S3 file for processing: {file_path}")
+        original_s3_path = file_path
+        temp_file_path = download_to_temp_file(file_path)
+        content_state["file_path"] = temp_file_path
+        # Don't delete the temp file during processing - we'll clean it up after
+        content_state["delete_source"] = False
+        logger.debug(f"Downloaded S3 file to temp: {temp_file_path}")
+
     # Add speech-to-text model configuration from Default Models
     try:
         model_manager = ModelManager()
@@ -617,9 +634,14 @@ async def content_process(state: SourceState) -> dict:
         logger.info(f"Starting content extraction for: {content_state.get('file_path', content_state.get('url', 'unknown'))}")
         processed_state = await extract_content(content_state)
         logger.info(f"Content extraction complete, title: {getattr(processed_state, 'title', 'N/A')}")
+
+        # Restore original S3 path in result if we downloaded from S3
+        if original_s3_path:
+            processed_state.file_path = original_s3_path
+            logger.debug(f"Restored S3 path in result: {original_s3_path}")
     finally:
         # Clean up temp file if we created one
-        if temp_file_path:
+        if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.unlink(temp_file_path)
                 logger.debug(f"Cleaned up temp file: {temp_file_path}")

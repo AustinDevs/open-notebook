@@ -28,6 +28,7 @@ from api.routers import (
     notes,
     podcasts,
     provider_configs,
+    s3_config,
     search,
     settings,
     source_chat,
@@ -106,6 +107,32 @@ async def lifespan(app: FastAPI):
         logger.exception(e)
         # Fail fast - don't start the API with an outdated database schema
         raise RuntimeError(f"Failed to run database migrations: {str(e)}") from e
+
+    # Initialize S3 credentials cache from database config
+    try:
+        from open_notebook.domain.s3_config import S3Config
+        from open_notebook.utils.storage import set_s3_credentials_cache
+
+        s3_config = await S3Config.get_instance()
+        if s3_config.is_configured():
+            set_s3_credentials_cache({
+                "access_key_id": s3_config.access_key_id.get_secret_value()
+                if s3_config.access_key_id
+                else None,
+                "secret_access_key": s3_config.secret_access_key.get_secret_value()
+                if s3_config.secret_access_key
+                else None,
+                "bucket": s3_config.bucket_name,
+                "region": s3_config.region or "us-east-1",
+                "endpoint": s3_config.endpoint_url,
+                "use_path_style": s3_config.use_path_style,
+                "public_url": s3_config.public_url,
+            })
+            logger.info(f"S3 storage configured from database: {s3_config.bucket_name}")
+        else:
+            logger.info("S3 storage not configured in database, using environment variables if set")
+    except Exception as e:
+        logger.warning(f"Could not initialize S3 config cache: {e}")
 
     logger.success("API initialization completed successfully")
 
@@ -216,6 +243,7 @@ app.include_router(
     embedding_rebuild.router, prefix="/api/embeddings", tags=["embeddings"]
 )
 app.include_router(settings.router, prefix="/api", tags=["settings"])
+app.include_router(s3_config.router, prefix="/api", tags=["s3-config"])
 app.include_router(context.router, prefix="/api", tags=["context"])
 app.include_router(sources.router, prefix="/api", tags=["sources"])
 app.include_router(insights.router, prefix="/api", tags=["insights"])

@@ -30,11 +30,18 @@ from api.models import (
     SourceUpdate,
 )
 from commands.source_commands import SourceProcessingInput
-from open_notebook.config import UPLOADS_FOLDER
+from open_notebook.config import DATA_FOLDER, UPLOADS_FOLDER
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import Notebook, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import InvalidInputError
+from open_notebook.utils.storage import (
+    delete_file,
+    file_exists,
+    get_file_stream,
+    is_s3_enabled,
+    upload_file as storage_upload_file,
+)
 
 router = APIRouter()
 
@@ -468,7 +475,7 @@ async def create_source(
                 # Clean up uploaded file if we created it
                 if file_path and upload_file:
                     try:
-                        os.unlink(file_path)
+                        delete_file(file_path)
                     except Exception:
                         pass
                 raise HTTPException(
@@ -527,7 +534,7 @@ async def create_source(
                     # Clean up uploaded file if we created it
                     if file_path and upload_file:
                         try:
-                            os.unlink(file_path)
+                            delete_file(file_path)
                         except Exception:
                             pass
                     raise HTTPException(
@@ -572,7 +579,7 @@ async def create_source(
                 # Clean up uploaded file if we created it
                 if file_path and upload_file:
                     try:
-                        os.unlink(file_path)
+                        delete_file(file_path)
                     except Exception:
                         pass
                 raise
@@ -581,7 +588,7 @@ async def create_source(
         # Clean up uploaded file on HTTP exceptions if we created it
         if file_path and upload_file:
             try:
-                os.unlink(file_path)
+                delete_file(file_path)
             except Exception:
                 pass
         raise
@@ -589,7 +596,7 @@ async def create_source(
         # Clean up uploaded file on validation errors if we created it
         if file_path and upload_file:
             try:
-                os.unlink(file_path)
+                delete_file(file_path)
             except Exception:
                 pass
         raise HTTPException(status_code=400, detail=str(e))
@@ -598,7 +605,7 @@ async def create_source(
         # Clean up uploaded file on unexpected errors if we created it
         if file_path and upload_file:
             try:
-                os.unlink(file_path)
+                delete_file(file_path)
             except Exception:
                 pass
         raise HTTPException(status_code=500, detail=f"Error creating source: {str(e)}")
@@ -633,11 +640,14 @@ async def _resolve_source_file(source_id: str) -> tuple[str, str]:
 
     # For local files, validate path is within uploads directory
     safe_root = os.path.realpath(UPLOADS_FOLDER)
+    data_root = os.path.realpath(DATA_FOLDER)
     resolved_path = os.path.realpath(file_path)
 
-    if not resolved_path.startswith(safe_root):
+    if not (
+        resolved_path.startswith(safe_root) or resolved_path.startswith(data_root)
+    ):
         logger.warning(
-            f"Blocked download outside uploads directory for source {source_id}: {resolved_path}"
+            f"Blocked download outside allowed directories for source {source_id}: {resolved_path}"
         )
         raise HTTPException(status_code=403, detail="Access to file denied")
 
@@ -663,9 +673,12 @@ def _is_source_file_available(source: Source) -> Optional[bool]:
 
     # For local files, validate path is within uploads directory
     safe_root = os.path.realpath(UPLOADS_FOLDER)
+    data_root = os.path.realpath(DATA_FOLDER)
     resolved_path = os.path.realpath(file_path)
 
-    if not resolved_path.startswith(safe_root):
+    if not (
+        resolved_path.startswith(safe_root) or resolved_path.startswith(data_root)
+    ):
         return False
 
     return os.path.exists(resolved_path)
@@ -1007,11 +1020,23 @@ async def retry_source_processing(source_id: str):
 
 @router.delete("/sources/{source_id}")
 async def delete_source(source_id: str):
-    """Delete a source."""
+    """Delete a source and its associated file (if any)."""
     try:
         source = await Source.get(source_id)
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
+
+        # Delete the associated file if it exists
+        if source.asset and source.asset.file_path:
+            storage_path = source.asset.file_path
+            try:
+                if delete_file(storage_path):
+                    logger.info(f"Deleted file for source {source_id}: {storage_path}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to delete file for source {source_id}: {storage_path} - {e}"
+                )
+                # Continue with source deletion even if file deletion fails
 
         await source.delete()
 

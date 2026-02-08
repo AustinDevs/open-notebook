@@ -1,26 +1,35 @@
 """
-Field-level encryption for sensitive data using API keys.
+Field-level encryption for sensitive data.
 
-This module provides encryption/decryption for API keys stored in the database.
+This module provides encryption/decryption for credentials stored in the database.
 Fernet uses AES-128-CBC with HMAC-SHA256 for authenticated encryption.
 
+Encryption is OPTIONAL:
+- If OPEN_NOTEBOOK_ENCRYPTION_KEY is set, values are encrypted at rest
+- If not set, values are stored as plain text (with warning logged)
+
 Usage:
-    # Encrypt before storing
+    # Encrypt before storing (returns plain text if encryption not configured)
     encrypted = encrypt_value(api_key)
 
-    # Decrypt when reading
+    # Decrypt when reading (returns original value if not encrypted)
     decrypted = decrypt_value(encrypted)
 
     # Generate a new key for OPEN_NOTEBOOK_ENCRYPTION_KEY
     new_key = generate_key()
 """
 
+import base64
 import os
 from pathlib import Path
 from typing import Optional
 
-from cryptography.fernet import Fernet, InvalidToken
 from loguru import logger
+
+# Lazy import to avoid startup failure if cryptography not installed
+_fernet_instance: Optional["Fernet"] = None
+_encryption_key: Optional[str] = None
+_encryption_checked: bool = False
 
 
 def get_secret_from_env(var_name: str) -> Optional[str]:
@@ -30,7 +39,7 @@ def get_secret_from_env(var_name: str) -> Optional[str]:
     Checks for VAR_FILE first (Docker secrets), then falls back to VAR.
 
     Args:
-        var_name: Base name of the environment variable (e.g., "OPEN_NOTEBOOK_ENCRYPTION_KEY")
+        var_name: Base name of the environment variable
 
     Returns:
         The secret value, or None if not configured.
@@ -56,73 +65,117 @@ def get_secret_from_env(var_name: str) -> Optional[str]:
     return os.environ.get(var_name)
 
 
-def _get_or_create_encryption_key() -> str:
+def _get_encryption_key() -> Optional[str]:
     """
-    Get encryption key from environment, requires explicit configuration.
+    Get encryption key from environment if configured.
 
     Priority:
     1. OPEN_NOTEBOOK_ENCRYPTION_KEY_FILE (Docker secrets)
     2. OPEN_NOTEBOOK_ENCRYPTION_KEY (environment variable)
 
-    For production deployments, you MUST set OPEN_NOTEBOOK_ENCRYPTION_KEY explicitly!
+    Returns:
+        Encryption key string, or None if not configured.
+    """
+    return get_secret_from_env("OPEN_NOTEBOOK_ENCRYPTION_KEY")
+
+
+def is_encryption_enabled() -> bool:
+    """
+    Check if encryption is enabled (key is configured).
 
     Returns:
-        Encryption key string.
-
-    Raises:
-        ValueError: If no encryption key is configured.
+        True if OPEN_NOTEBOOK_ENCRYPTION_KEY is set, False otherwise.
     """
-    # First check environment/Docker secrets
-    key = get_secret_from_env("OPEN_NOTEBOOK_ENCRYPTION_KEY")
-    if key:
-        return key
+    global _encryption_checked, _encryption_key
 
-    raise ValueError(
-        "OPEN_NOTEBOOK_ENCRYPTION_KEY is not set. "
-        "For security reasons, you must set a unique encryption key. "
-        "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
-    )
+    if not _encryption_checked:
+        _encryption_key = _get_encryption_key()
+        _encryption_checked = True
+
+        if not _encryption_key:
+            logger.warning(
+                "OPEN_NOTEBOOK_ENCRYPTION_KEY is not set. "
+                "Credentials will be stored as plain text. "
+                "For production, generate a key with: "
+                'python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
+            )
+
+    return _encryption_key is not None
 
 
-# Master encryption key (supports Docker secrets + auto-generation)
-_ENCRYPTION_KEY = _get_or_create_encryption_key()
-
-
-def get_fernet() -> Fernet:
+def get_fernet() -> Optional["Fernet"]:
     """
     Get Fernet instance with the configured encryption key.
 
     Returns:
-        Fernet instance.
-
-    Raises:
-        ValueError: If encryption key is not configured.
+        Fernet instance, or None if encryption is not configured.
     """
-    return Fernet(_ENCRYPTION_KEY.encode())
+    global _fernet_instance
+
+    if not is_encryption_enabled():
+        return None
+
+    if _fernet_instance is None:
+        try:
+            from cryptography.fernet import Fernet
+
+            _fernet_instance = Fernet(_encryption_key.encode())
+        except ImportError:
+            logger.error(
+                "cryptography package not installed. "
+                "Install with: pip install cryptography"
+            )
+            return None
+        except Exception as e:
+            logger.error(f"Failed to initialize encryption: {e}")
+            return None
+
+    return _fernet_instance
 
 
 def encrypt_value(value: str) -> str:
     """
     Encrypt a string value using Fernet symmetric encryption.
 
+    If encryption is not configured, returns the original value.
+
     Args:
         value: The plain text string to encrypt.
 
     Returns:
-        Base64-encoded encrypted string.
-
-    Raises:
-        ValueError: If encryption is not configured.
+        Base64-encoded encrypted string, or original value if encryption disabled.
     """
     fernet = get_fernet()
-    return fernet.encrypt(value.encode()).decode()
+    if fernet is None:
+        return value
+
+    try:
+        return fernet.encrypt(value.encode()).decode()
+    except Exception as e:
+        logger.error(f"Encryption failed: {e}")
+        return value
+
+
+def _looks_like_fernet_token(s: str) -> bool:
+    """Check if string looks like a Fernet encrypted token."""
+    if len(s) < 40:  # Minimum length for Fernet token
+        return False
+    # Fernet tokens use URL-safe base64
+    try:
+        decoded = base64.urlsafe_b64decode(s)
+        # Fernet tokens have a specific structure
+        return len(decoded) >= 57  # Version (1) + timestamp (8) + IV (16) + data (32+)
+    except Exception:
+        return False
 
 
 def decrypt_value(value: str) -> str:
     """
     Decrypt a Fernet-encrypted string value.
 
-    Handles graceful fallback for legacy unencrypted data.
+    Handles graceful fallback for:
+    - Unencrypted legacy data
+    - Data stored when encryption was disabled
 
     Args:
         value: The encrypted string (or plain text for legacy data).
@@ -131,43 +184,35 @@ def decrypt_value(value: str) -> str:
         Decrypted plain text string, or original value if not encrypted.
 
     Raises:
-        ValueError: If encryption is not configured or if decryption fails
-            for what appears to be encrypted data (wrong key).
+        ValueError: If decryption fails for what appears to be encrypted data
+            (likely wrong key).
     """
+    # If it doesn't look like encrypted data, return as-is
+    if not _looks_like_fernet_token(value):
+        return value
+
     fernet = get_fernet()
-    if not fernet:
-        raise ValueError("Encryption is not configured. Set OPEN_NOTEBOOK_ENCRYPTION_KEY.")
-
-    # Check if value appears to be encrypted (Fernet token format)
-    # Fernet tokens are URL-safe base64, 56 bytes after decoding
-    # They contain only URL-safe base64 chars: A-Za-z0-9_-
-    import base64
-
-    def looks_like_fernet_token(s: str) -> bool:
-        """Check if string looks like a Fernet encrypted token."""
-        if len(s) < 40:  # Minimum length for Fernet token
-            return False
-        # Fernet tokens use URL-safe base64
-        try:
-            decoded = base64.urlsafe_b64decode(s)
-            return len(decoded) == 56  # Fernet token is always 56 bytes
-        except Exception:
-            return False
+    if fernet is None:
+        # Encryption not configured but data looks encrypted
+        logger.warning(
+            "Data appears to be encrypted but OPEN_NOTEBOOK_ENCRYPTION_KEY is not set. "
+            "Returning encrypted value as-is."
+        )
+        return value
 
     try:
+        from cryptography.fernet import InvalidToken
+
         return fernet.decrypt(value.encode()).decode()
     except InvalidToken:
-        if looks_like_fernet_token(value):
-            # Looks like encrypted data but failed to decrypt - likely wrong key
-            raise ValueError(
-                "Decryption failed: data appears to be encrypted but key is incorrect. "
-                "Check OPEN_NOTEBOOK_ENCRYPTION_KEY configuration."
-            )
-        # Not a valid token - treat as legacy plaintext
+        # Looks like encrypted data but failed to decrypt - likely wrong key
+        raise ValueError(
+            "Decryption failed: data appears to be encrypted but key is incorrect. "
+            "Check OPEN_NOTEBOOK_ENCRYPTION_KEY configuration."
+        )
+    except ImportError:
+        logger.error("cryptography package not installed for decryption")
         return value
-    except Exception as e:
-        logger.error(f"Decryption failed: {e}")
-        raise ValueError(f"Decryption failed: {str(e)}")
     except Exception as e:
         logger.error(f"Decryption failed: {e}")
         return value
@@ -180,11 +225,13 @@ def generate_key() -> str:
     Use this to create a value for OPEN_NOTEBOOK_ENCRYPTION_KEY.
 
     Returns:
-        Base64-encoded Fernet key suitable for use as OPEN_NOTEBOOK_ENCRYPTION_KEY.
+        Base64-encoded Fernet key.
 
     Example:
         >>> from open_notebook.utils.encryption import generate_key
         >>> print(generate_key())
         'your-generated-key-here'
     """
+    from cryptography.fernet import Fernet
+
     return Fernet.generate_key().decode()

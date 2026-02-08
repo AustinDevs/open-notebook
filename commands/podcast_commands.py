@@ -1,3 +1,4 @@
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -10,6 +11,7 @@ from open_notebook.ai.key_provider import provision_all_keys
 from open_notebook.config import DATA_FOLDER
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.podcasts.models import EpisodeProfile, PodcastEpisode, SpeakerProfile
+from open_notebook.utils.storage import is_s3_enabled, upload_file
 
 try:
     from podcast_creator import configure, create_podcast
@@ -173,8 +175,6 @@ async def generate_podcast_command(
 
         # Upload to S3 if enabled
         if local_audio_path:
-            from open_notebook.utils.storage import is_s3_enabled, upload_file
-
             if is_s3_enabled():
                 try:
                     # Read local file and upload to S3

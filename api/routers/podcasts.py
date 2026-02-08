@@ -12,6 +12,7 @@ from api.podcast_service import (
     PodcastGenerationResponse,
     PodcastService,
 )
+from open_notebook.utils.storage import delete_file, file_exists, get_file_stream
 
 router = APIRouter()
 
@@ -60,6 +61,14 @@ def _resolve_audio_path(audio_file: str) -> Optional[Path]:
         raise HTTPException(status_code=403, detail="Access to audio file denied")
 
     return path
+
+
+def _audio_file_exists(audio_file: str) -> bool:
+    """Check if audio file exists (local or S3)."""
+    if audio_file.startswith("s3://"):
+        return file_exists(audio_file)
+    audio_path = _resolve_audio_path(audio_file)
+    return audio_path is not None and audio_path.exists()
 
 
 @router.post("/podcasts/generate", response_model=PodcastGenerationResponse)
@@ -132,13 +141,8 @@ async def list_podcast_episodes():
 
             audio_url = None
             if episode.audio_file:
-                # S3 URIs are always available (checked at stream time)
-                if episode.audio_file.startswith("s3://"):
+                if _audio_file_exists(episode.audio_file):
                     audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
-                else:
-                    audio_path = _resolve_audio_path(episode.audio_file)
-                    if audio_path and audio_path.exists():
-                        audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
 
             response_episodes.append(
                 PodcastEpisodeResponse(
@@ -184,13 +188,8 @@ async def get_podcast_episode(episode_id: str):
 
         audio_url = None
         if episode.audio_file:
-            # S3 URIs are always available (checked at stream time)
-            if episode.audio_file.startswith("s3://"):
+            if _audio_file_exists(episode.audio_file):
                 audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
-            else:
-                audio_path = _resolve_audio_path(episode.audio_file)
-                if audio_path and audio_path.exists():
-                    audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
 
         return PodcastEpisodeResponse(
             id=str(episode.id),
