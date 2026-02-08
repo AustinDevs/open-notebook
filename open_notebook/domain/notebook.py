@@ -675,10 +675,7 @@ async def text_search(
             filtered_results = []
             for result in search_results:
                 result_user_id = result.get("user_id")
-                if result_user_id is None:
-                    # Include results with no user_id (legacy data)
-                    filtered_results.append(result)
-                else:
+                if result_user_id is not None:
                     # Check if user_id matches
                     result_user_str = str(result_user_id)
                     if ":" in result_user_str:
@@ -688,6 +685,7 @@ async def text_search(
 
                     if result_user_suffix == user_id_suffix:
                         filtered_results.append(result)
+                # Records with user_id = None are excluded (strict user isolation)
 
             return filtered_results[:results]  # Limit to requested results
 
@@ -756,10 +754,7 @@ async def vector_search(
             filtered_results = []
             for result in search_results:
                 result_user_id = result.get("user_id")
-                if result_user_id is None:
-                    # Include results with no user_id (legacy data)
-                    filtered_results.append(result)
-                else:
+                if result_user_id is not None:
                     # Check if user_id matches
                     result_user_str = str(result_user_id)
                     if ":" in result_user_str:
@@ -769,6 +764,7 @@ async def vector_search(
 
                     if result_user_suffix == user_id_suffix:
                         filtered_results.append(result)
+                # Records with user_id = None are excluded (strict user isolation)
 
             return filtered_results[:results]  # Limit to requested results
 

@@ -8,8 +8,8 @@ from open_notebook.domain.base import RecordModel
 class ContentSettings(RecordModel):
     record_id: ClassVar[str] = "open_notebook:content_settings"
     default_content_processing_engine_doc: Optional[
-        Literal["auto", "docling", "simple"]
-    ] = Field("auto", description="Default Content Processing Engine for Documents")
+        Literal["auto", "simple"]
+    ] = Field("simple", description="Default Content Processing Engine for Documents")
     default_content_processing_engine_url: Optional[
         Literal["auto", "firecrawl", "jina", "simple"]
     ] = Field("auto", description="Default Content Processing Engine for URLs")

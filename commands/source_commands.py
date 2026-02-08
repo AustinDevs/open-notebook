@@ -15,12 +15,6 @@ try:
 except ImportError:
     UnsupportedTypeException = None  # type: ignore[misc,assignment]
 
-# Import docling exception for handling conversion errors
-try:
-    from docling.exceptions import ConversionError as DoclingConversionError
-except ImportError:
-    DoclingConversionError = None  # type: ignore[misc,assignment]
-
 try:
     from open_notebook.graphs.source import source_graph
     from open_notebook.graphs.transformation import graph as transform_graph
@@ -210,18 +204,6 @@ async def process_source_command(
                 source_id=input_data.source_id,
                 processing_time=processing_time,
                 error_message=f"Unsupported file type: {e}",
-            )
-        # Check for DoclingConversionError (permanent failure - document couldn't be processed)
-        if DoclingConversionError is not None and isinstance(
-            e, DoclingConversionError
-        ):
-            processing_time = time.time() - start_time
-            logger.error(f"Document conversion failed: {e}")
-            return SourceProcessingOutput(
-                success=False,
-                source_id=input_data.source_id,
-                processing_time=processing_time,
-                error_message=f"Document conversion failed: {e}",
             )
         # Transient failure - will be retried (surreal-commands logs final failure)
         logger.debug(

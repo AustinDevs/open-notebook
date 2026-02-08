@@ -34,7 +34,7 @@ class Model(ObjectModel):
             if not user_id_str.startswith("user:"):
                 user_id_str = f"user:{user_id_str}"
             models = await repo_query(
-                f"SELECT * FROM model WHERE type=$model_type AND (user_id = {user_id_str} OR user_id = NONE)",
+                f"SELECT * FROM model WHERE type=$model_type AND user_id = {user_id_str}",
                 {"model_type": model_type}
             )
         else:

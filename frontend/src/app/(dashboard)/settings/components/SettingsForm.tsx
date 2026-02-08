@@ -16,7 +16,7 @@ import { ChevronDownIcon } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
 
 const settingsSchema = z.object({
-  default_content_processing_engine_doc: z.enum(['auto', 'docling', 'simple']).optional(),
+  default_content_processing_engine_doc: z.enum(['auto', 'simple']).optional(),
   default_content_processing_engine_url: z.enum(['auto', 'firecrawl', 'jina', 'simple']).optional(),
   default_embedding_option: z.enum(['ask', 'always', 'never']).optional(),
   auto_delete_files: z.enum(['yes', 'no']).optional(),
@@ -60,7 +60,7 @@ export function SettingsForm() {
   useEffect(() => {
     if (settings && settings.default_content_processing_engine_doc && !hasResetForm) {
       const formData = {
-        default_content_processing_engine_doc: settings.default_content_processing_engine_doc as 'auto' | 'docling' | 'simple',
+        default_content_processing_engine_doc: settings.default_content_processing_engine_doc as 'auto' | 'simple',
         default_content_processing_engine_url: settings.default_content_processing_engine_url as 'auto' | 'firecrawl' | 'jina' | 'simple',
         default_embedding_option: settings.default_embedding_option as 'ask' | 'always' | 'never',
         auto_delete_files: settings.auto_delete_files as 'yes' | 'no',
@@ -121,7 +121,6 @@ export function SettingsForm() {
                       </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="auto">{t.settings.autoRecommended}</SelectItem>
-                      <SelectItem value="docling">{t.settings.docling}</SelectItem>
                       <SelectItem value="simple">{t.settings.simple}</SelectItem>
                     </SelectContent>
                   </Select>

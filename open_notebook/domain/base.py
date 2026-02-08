@@ -77,13 +77,13 @@ class ObjectModel(BaseModel):
             params: Dict[str, Any] = {}
 
             if current_user:
-                # Filter by user_id: return records owned by user OR with no owner
+                # Filter by user_id: return records owned by user OR shared (no user_id)
                 # Use direct interpolation - safe since current_user comes from validated JWT
                 user_id_str = str(current_user)
                 # Ensure it has the user: prefix
                 if not user_id_str.startswith("user:"):
                     user_id_str = f"user:{user_id_str}"
-                where_clause = f"WHERE user_id = {user_id_str} OR user_id = NONE"
+                where_clause = f"WHERE (user_id = {user_id_str} OR user_id IS NULL)"
                 logger.debug(f"get_all: current_user={current_user}, where_clause={where_clause}")
             else:
                 where_clause = ""

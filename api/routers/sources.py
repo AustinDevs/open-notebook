@@ -48,7 +48,7 @@ def get_user_filter_clause(prefix: str = "") -> tuple[str, Dict[str, Any]]:
 
     Returns a tuple of (clause, params) where clause is either:
     - "" (empty string) if no user context
-    - "WHERE {prefix}user_id = user:{id} OR {prefix}user_id = NONE" if user context exists
+    - "WHERE {prefix}user_id = user:{id}" if user context exists (strict isolation)
 
     Note: Uses direct interpolation for user_id because SurrealDB Python driver
     doesn't correctly pass RecordID parameters in WHERE clauses.
@@ -61,7 +61,7 @@ def get_user_filter_clause(prefix: str = "") -> tuple[str, Dict[str, Any]]:
         if not user_id_str.startswith("user:"):
             user_id_str = f"user:{user_id_str}"
         return (
-            f"WHERE {field} = {user_id_str} OR {field} = NONE",
+            f"WHERE {field} = {user_id_str}",
             {},
         )
     return ("", {})
