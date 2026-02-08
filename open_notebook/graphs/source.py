@@ -1,4 +1,5 @@
 import operator
+import os
 from typing import Any, Dict, List, Optional
 
 from content_core import extract_content
@@ -14,6 +15,7 @@ from open_notebook.domain.content_settings import ContentSettings
 from open_notebook.domain.notebook import Asset, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.graphs.transformation import graph as transform_graph
+from open_notebook.utils.storage import download_to_temp_file
 
 
 class SourceState(TypedDict):
@@ -59,6 +61,20 @@ async def content_process(state: SourceState) -> dict:
     )
     content_state["output_format"] = "markdown"
 
+    # Handle S3 files - download to temp file for processing
+    original_s3_path = None
+    temp_file_path = None
+    file_path = content_state.get("file_path")
+
+    if file_path and file_path.startswith("s3://"):
+        logger.debug(f"Downloading S3 file for processing: {file_path}")
+        original_s3_path = file_path
+        temp_file_path = download_to_temp_file(file_path)
+        content_state["file_path"] = temp_file_path
+        # Don't delete the temp file during processing - we'll clean it up after
+        content_state["delete_source"] = False
+        logger.debug(f"Downloaded S3 file to temp: {temp_file_path}")
+
     # Add speech-to-text model configuration from Default Models
     try:
         model_manager = ModelManager()
@@ -75,7 +91,22 @@ async def content_process(state: SourceState) -> dict:
         logger.warning(f"Failed to retrieve speech-to-text model configuration: {e}")
         # Continue without custom audio model (content-core will use its default)
 
-    processed_state = await extract_content(content_state)
+    try:
+        processed_state = await extract_content(content_state)
+
+        # Restore original S3 path in result if we downloaded from S3
+        if original_s3_path:
+            processed_state.file_path = original_s3_path
+            logger.debug(f"Restored S3 path in result: {original_s3_path}")
+    finally:
+        # Clean up temp file if we created one
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+                logger.debug(f"Cleaned up temp file: {temp_file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temp file {temp_file_path}: {e}")
+
     return {"content_state": processed_state}
 
 

@@ -3,7 +3,7 @@ from typing import List, Optional
 from urllib.parse import unquote, urlparse
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
 
@@ -12,6 +12,7 @@ from api.podcast_service import (
     PodcastGenerationResponse,
     PodcastService,
 )
+from open_notebook.utils.storage import delete_file, file_exists, get_file_stream
 
 router = APIRouter()
 
@@ -30,11 +31,27 @@ class PodcastEpisodeResponse(BaseModel):
     job_status: Optional[str] = None
 
 
-def _resolve_audio_path(audio_file: str) -> Path:
+def _resolve_audio_path(audio_file: str) -> tuple[str, bool]:
+    """
+    Resolve audio file path.
+
+    Returns:
+        Tuple of (resolved_path, is_s3)
+    """
+    if audio_file.startswith("s3://"):
+        return audio_file, True
     if audio_file.startswith("file://"):
         parsed = urlparse(audio_file)
-        return Path(unquote(parsed.path))
-    return Path(audio_file)
+        return unquote(parsed.path), False
+    return audio_file, False
+
+
+def _audio_file_exists(audio_file: str) -> bool:
+    """Check if audio file exists (local or S3)."""
+    resolved_path, is_s3 = _resolve_audio_path(audio_file)
+    if is_s3:
+        return file_exists(resolved_path)
+    return Path(resolved_path).exists()
 
 
 @router.post("/podcasts/generate", response_model=PodcastGenerationResponse)
@@ -107,8 +124,7 @@ async def list_podcast_episodes():
 
             audio_url = None
             if episode.audio_file:
-                audio_path = _resolve_audio_path(episode.audio_file)
-                if audio_path.exists():
+                if _audio_file_exists(episode.audio_file):
                     audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
 
             response_episodes.append(
@@ -155,8 +171,7 @@ async def get_podcast_episode(episode_id: str):
 
         audio_url = None
         if episode.audio_file:
-            audio_path = _resolve_audio_path(episode.audio_file)
-            if audio_path.exists():
+            if _audio_file_exists(episode.audio_file):
                 audio_url = f"/api/podcasts/episodes/{episode.id}/audio"
 
         return PodcastEpisodeResponse(
@@ -192,15 +207,31 @@ async def stream_podcast_episode_audio(episode_id: str):
     if not episode.audio_file:
         raise HTTPException(status_code=404, detail="Episode has no audio file")
 
-    audio_path = _resolve_audio_path(episode.audio_file)
-    if not audio_path.exists():
-        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+    resolved_path, is_s3 = _resolve_audio_path(episode.audio_file)
 
-    return FileResponse(
-        audio_path,
-        media_type="audio/mpeg",
-        filename=audio_path.name,
-    )
+    if is_s3:
+        # Stream from S3
+        if not file_exists(resolved_path):
+            raise HTTPException(status_code=404, detail="Audio file not found in storage")
+
+        file_stream = get_file_stream(resolved_path)
+        filename = resolved_path.split("/")[-1]
+        return StreamingResponse(
+            file_stream,
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    else:
+        # Serve local file
+        audio_path = Path(resolved_path)
+        if not audio_path.exists():
+            raise HTTPException(status_code=404, detail="Audio file not found on disk")
+
+        return FileResponse(
+            audio_path,
+            media_type="audio/mpeg",
+            filename=audio_path.name,
+        )
 
 
 @router.delete("/podcasts/episodes/{episode_id}")
@@ -212,13 +243,13 @@ async def delete_podcast_episode(episode_id: str):
 
         # Delete the physical audio file if it exists
         if episode.audio_file:
-            audio_path = _resolve_audio_path(episode.audio_file)
-            if audio_path.exists():
-                try:
-                    audio_path.unlink()
-                    logger.info(f"Deleted audio file: {audio_path}")
-                except Exception as e:
-                    logger.warning(f"Failed to delete audio file {audio_path}: {e}")
+            resolved_path, is_s3 = _resolve_audio_path(episode.audio_file)
+            try:
+                if delete_file(resolved_path):
+                    logger.info(f"Deleted audio file: {resolved_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete audio file {resolved_path}: {e}")
+                # Continue with episode deletion even if file deletion fails
 
         # Delete the episode from the database
         await episode.delete()
