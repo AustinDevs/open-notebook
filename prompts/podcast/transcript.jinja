@@ -28,6 +28,13 @@ The podcast features the following speakers:
 {% endfor %}
 </speakers>
 
+CRITICAL SPEAKER NAME RULES:
+- You MUST use EXACTLY these speaker names with EXACT spelling and capitalization: {{ speaker_names|join(', ') }}
+- Do NOT modify, abbreviate, or rephrase speaker names in any way
+- Do NOT add any speakers beyond those listed above
+- Do NOT use variations like first name only, nicknames, or alternative spellings
+- If a speaker name is "Alice Smith", use "Alice Smith" exactly - not "Alice", not "Smith", not "alice smith"
+
 Next, examine the outline produced by our director:
 <outline>
 {{ outline }}
@@ -78,13 +85,24 @@ Follow these format requirements strictly:
 {
     "transcript": [
         {
-            "speaker": "[Actual Speaker Name]",
+            "speaker": "{{ speaker_names[0] }}",
             "dialogue": "[Speaker's dialogue based on their personality and expertise]"
         },
+{% if speaker_names|length > 1 %}
+        {
+            "speaker": "{{ speaker_names[1] }}",
+            "dialogue": "[Speaker's dialogue based on their personality and expertise]"
+        },
+{% endif %}
     ...
     ]
 }
 ```
+
+ALLOWED SPEAKER NAMES (use these EXACTLY):
+{% for name in speaker_names %}
+- "{{ name }}"
+{% endfor %}
 
 Formatting instructions:
 {{ format_instructions}}
@@ -100,7 +118,8 @@ Guidelines for creating the transcript:
    - Use appropriate transitions between topics.
    - Match the speaker's dialogue to their personality and expertise.
    - This is a whole podcast so no need to reintroduce the speaker or topics on each segment. Segments are just markers for us to know to change the topics, nothing else.
-   - CRITICAL: There is only ONE speaker. Use ONLY: {{ speaker_names[0] }}. Do NOT invent additional speakers.
+   - CRITICAL: There is only ONE speaker. Use EXACTLY: "{{ speaker_names[0] }}" (copy-paste this name)
+   - ANY deviation from the exact speaker name will cause a validation error
 {% else %}
 Guidelines for creating the transcript:
    - Ensure the conversation flows naturally and covers all points in the outline.
@@ -112,7 +131,9 @@ Guidelines for creating the transcript:
    - Match each speaker's dialogue to their personality and expertise.
    - Choose speakers strategically based on who would naturally contribute to each topic.
    - This is a whole podcast so no need to reintroduce speakers or topics on each segment. Segments are just markers for us to know to change the topics, nothing else.
-   - IMPORTANT: Only use the provided speaker names: {{ speaker_names|join(', ') }}
+   - CRITICAL: Only use these EXACT speaker names (copy-paste them): {% for name in speaker_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %}
+
+   - ANY deviation from exact speaker names will cause a validation error
 {% endif %}
 
 IMPORTANT OUTPUT FORMAT:
@@ -127,8 +148,9 @@ When you're ready, provide the transcript.
 {% if speakers|length == 1 %}
 Remember, you are creating a realistic solo podcast presentation based on the given information.
 Make it informative, engaging, and natural-sounding while adhering to the format requirements.
-There is only ONE speaker - do not add any other speakers.
+There is only ONE speaker - use EXACTLY: "{{ speaker_names[0] }}"
 {% else %}
 Remember, you are creating a realistic podcast conversation based on the given information.
 Make it informative, engaging, and natural-sounding while adhering to the format requirements.
+Use ONLY these exact speaker names: {% for name in speaker_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %}
 {% endif %}

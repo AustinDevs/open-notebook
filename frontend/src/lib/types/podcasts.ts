@@ -68,6 +68,20 @@ export interface PodcastGenerationResponse {
   episode_name: string
 }
 
+// Interactive podcast types
+export interface InteractivePodcastRequest {
+  audio_base64: string
+  current_time: number
+  total_duration: number
+}
+
+export interface InteractivePodcastResponse {
+  answer_text: string
+  answer_audio_base64?: string | null
+  question_transcript: string
+  has_audio: boolean
+}
+
 export type EpisodeStatusGroup = 'running' | 'completed' | 'failed' | 'pending'
 
 export type EpisodeStatusGroups = Record<EpisodeStatusGroup, PodcastEpisode[]>

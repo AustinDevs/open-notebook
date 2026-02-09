@@ -6,6 +6,7 @@ import { getDateLocale } from '@/lib/utils/date-locale'
 import { InfoIcon, Trash2 } from 'lucide-react'
 
 import { resolvePodcastAssetUrl } from '@/lib/api/podcasts'
+import { InteractivePodcastPlayer } from './InteractivePodcastPlayer'
 import { EpisodeStatus, PodcastEpisode } from '@/lib/types/podcasts'
 import { cn } from '@/lib/utils'
 import {
@@ -250,7 +251,7 @@ export function EpisodeCard({ episode, onDelete, deleting }: EpisodeCardProps) {
                 </DialogHeader>
                 <div className="space-y-4 overflow-hidden">
                   {audioSrc ? (
-                    <audio controls preload="none" src={audioSrc} className="w-full" />
+                    <InteractivePodcastPlayer episodeId={episode.id} audioSrc={audioSrc} />
                   ) : audioError ? (
                     <p className="text-sm text-destructive">{audioError}</p>
                   ) : null}
@@ -397,7 +398,7 @@ export function EpisodeCard({ episode, onDelete, deleting }: EpisodeCardProps) {
         </div>
 
         {audioSrc ? (
-          <audio controls preload="none" src={audioSrc} className="w-full" />
+          <InteractivePodcastPlayer episodeId={episode.id} audioSrc={audioSrc} />
         ) : audioError ? (
           <p className="text-sm text-destructive">{audioError}</p>
         ) : null}

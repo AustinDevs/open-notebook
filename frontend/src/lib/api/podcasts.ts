@@ -6,6 +6,8 @@ import {
   SpeakerProfile,
   PodcastGenerationRequest,
   PodcastGenerationResponse,
+  InteractivePodcastRequest,
+  InteractivePodcastResponse,
 } from '@/lib/types/podcasts'
 
 export type EpisodeProfileInput = Omit<EpisodeProfile, 'id'>
@@ -107,6 +109,15 @@ export const podcastsApi = {
     const response = await apiClient.post<PodcastGenerationResponse>(
       '/podcasts/generate',
       payload
+    )
+    return response.data
+  },
+
+  // Interactive podcast methods
+  askQuestion: async (episodeId: string, request: InteractivePodcastRequest) => {
+    const response = await apiClient.post<InteractivePodcastResponse>(
+      `/podcasts/episodes/${episodeId}/ask`,
+      request
     )
     return response.data
   },

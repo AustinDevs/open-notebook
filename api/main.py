@@ -21,6 +21,7 @@ from api.routers import (
     embedding_rebuild,
     episode_profiles,
     insights,
+    interactive_podcasts,
     models,
     notebooks,
     notes,
@@ -158,6 +159,7 @@ app.include_router(sources.router, prefix="/api", tags=["sources"])
 app.include_router(insights.router, prefix="/api", tags=["insights"])
 app.include_router(commands_router.router, prefix="/api", tags=["commands"])
 app.include_router(podcasts.router, prefix="/api", tags=["podcasts"])
+app.include_router(interactive_podcasts.router, prefix="/api", tags=["interactive-podcasts"])
 app.include_router(episode_profiles.router, prefix="/api", tags=["episode-profiles"])
 app.include_router(speaker_profiles.router, prefix="/api", tags=["speaker-profiles"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
