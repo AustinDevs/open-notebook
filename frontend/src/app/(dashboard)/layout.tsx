@@ -2,8 +2,9 @@
 
 import { useAuth } from '@/lib/hooks/use-auth'
 import { useVersionCheck } from '@/lib/hooks/use-version-check'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useAuthStore } from '@/lib/stores/auth-store'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState, useRef } from 'react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { ModalProvider } from '@/components/providers/ModalProvider'
@@ -16,11 +17,28 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const { isAuthenticated, isLoading } = useAuth()
+  const setTokenFromUrl = useAuthStore((s) => s.setTokenFromUrl)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
+  const tokenExtracted = useRef(false)
 
   // Check for version updates once per session
   useVersionCheck()
+
+  // Extract JWT token from URL query parameter (for iframe embedding)
+  useEffect(() => {
+    if (tokenExtracted.current) return
+    const urlToken = searchParams.get('token')
+    if (urlToken) {
+      tokenExtracted.current = true
+      setTokenFromUrl(urlToken)
+      // Strip token from URL for security
+      const url = new URL(window.location.href)
+      url.searchParams.delete('token')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [searchParams, setTokenFromUrl])
 
   useEffect(() => {
     // Mark that we've completed the initial auth check

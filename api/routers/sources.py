@@ -14,9 +14,9 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, Response
 from loguru import logger
-from surreal_commands import execute_command_sync, submit_command
+from surreal_commands import execute_command_sync
 
-from api.command_service import CommandService
+from api.command_service import CommandService, user_aware_submit
 from api.models import (
     AssetModel,
     CreateSourceInsightRequest,
@@ -989,7 +989,7 @@ async def create_source_insight(source_id: str, request: CreateSourceInsightRequ
             raise HTTPException(status_code=404, detail="Transformation not found")
 
         # Submit transformation as background job (fire-and-forget)
-        command_id = submit_command(
+        command_id = user_aware_submit(
             "open_notebook",
             "run_transformation",
             {

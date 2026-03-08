@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from api.auth import PasswordAuthMiddleware
+from api.auth import JWTAuthMiddleware, PasswordAuthMiddleware, current_user_id
 from open_notebook.exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -74,38 +75,49 @@ async def lifespan(app: FastAPI):
             "Set OPEN_NOTEBOOK_ENCRYPTION_KEY to any secret string."
         )
 
-    # Run database migrations
+    # Run database migrations (skip in JWT mode - migrations run lazily per-user)
+    auth_mode = os.environ.get("AUTH_MODE", "password")
 
-    try:
-        migration_manager = AsyncMigrationManager()
-        current_version = await migration_manager.get_current_version()
-        logger.info(f"Current database version: {current_version}")
+    if auth_mode == "jwt":
+        logger.info(
+            "AUTH_MODE=jwt: Skipping startup migrations "
+            "(they run lazily per-user on first request)"
+        )
+    else:
+        try:
+            migration_manager = AsyncMigrationManager()
+            current_version = await migration_manager.get_current_version()
+            logger.info(f"Current database version: {current_version}")
 
-        if await migration_manager.needs_migration():
-            logger.warning("Database migrations are pending. Running migrations...")
-            await migration_manager.run_migration_up()
-            new_version = await migration_manager.get_current_version()
-            logger.success(
-                f"Migrations completed successfully. Database is now at version {new_version}"
-            )
-        else:
-            logger.info(
-                "Database is already at the latest version. No migrations needed."
-            )
-    except Exception as e:
-        logger.error(f"CRITICAL: Database migration failed: {str(e)}")
-        logger.exception(e)
-        # Fail fast - don't start the API with an outdated database schema
-        raise RuntimeError(f"Failed to run database migrations: {str(e)}") from e
+            if await migration_manager.needs_migration():
+                logger.warning(
+                    "Database migrations are pending. Running migrations..."
+                )
+                await migration_manager.run_migration_up()
+                new_version = await migration_manager.get_current_version()
+                logger.success(
+                    f"Migrations completed successfully. Database is now at version {new_version}"
+                )
+            else:
+                logger.info(
+                    "Database is already at the latest version. No migrations needed."
+                )
+        except Exception as e:
+            logger.error(f"CRITICAL: Database migration failed: {str(e)}")
+            logger.exception(e)
+            # Fail fast - don't start the API with an outdated database schema
+            raise RuntimeError(
+                f"Failed to run database migrations: {str(e)}"
+            ) from e
 
-    # Run podcast profile data migration (legacy strings -> Model registry)
-    try:
-        from open_notebook.podcasts.migration import migrate_podcast_profiles
+        # Run podcast profile data migration (legacy strings -> Model registry)
+        try:
+            from open_notebook.podcasts.migration import migrate_podcast_profiles
 
-        await migrate_podcast_profiles()
-    except Exception as e:
-        logger.warning(f"Podcast profile migration encountered errors: {e}")
-        # Non-fatal: profiles can be migrated manually via UI
+            await migrate_podcast_profiles()
+        except Exception as e:
+            logger.warning(f"Podcast profile migration encountered errors: {e}")
+            # Non-fatal: profiles can be migrated manually via UI
 
     logger.success("API initialization completed successfully")
 
@@ -122,20 +134,33 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add password authentication middleware first
-# Exclude /api/auth/status and /api/config from authentication
-app.add_middleware(
-    PasswordAuthMiddleware,
-    excluded_paths=[
-        "/",
-        "/health",
-        "/docs",
-        "/openapi.json",
-        "/redoc",
-        "/api/auth/status",
-        "/api/config",
-    ],
-)
+AUTH_MODE = os.environ.get("AUTH_MODE", "password")
+AUTH_EXCLUDED_PATHS = [
+    "/",
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/api/auth/status",
+    "/api/config",
+]
+
+# Add authentication middleware based on AUTH_MODE
+if AUTH_MODE == "jwt":
+    logger.info("Using JWT authentication middleware (multiuser mode)")
+    app.add_middleware(JWTAuthMiddleware, excluded_paths=AUTH_EXCLUDED_PATHS)
+else:
+    logger.info("Using password authentication middleware (single-user mode)")
+    app.add_middleware(PasswordAuthMiddleware, excluded_paths=AUTH_EXCLUDED_PATHS)
+
+
+@app.middleware("http")
+async def clear_user_context_middleware(request: Request, call_next):
+    """Reset current_user_id ContextVar at the start of each request."""
+    current_user_id.set(None)
+    response = await call_next(request)
+    return response
+
 
 # Add CORS middleware last (so it processes first)
 app.add_middleware(

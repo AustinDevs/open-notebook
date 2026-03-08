@@ -5,6 +5,7 @@ from loguru import logger
 from pydantic import BaseModel
 from surreal_commands import CommandInput, CommandOutput, command
 
+from api.auth import set_user_context
 from open_notebook.database.repository import ensure_record_id
 from open_notebook.domain.notebook import Source
 from open_notebook.domain.transformation import Transformation
@@ -35,6 +36,7 @@ class SourceProcessingInput(CommandInput):
     notebook_ids: List[str]
     transformations: List[str]
     embed: bool
+    user_id: Optional[str] = None
 
 
 class SourceProcessingOutput(CommandOutput):
@@ -64,6 +66,7 @@ async def process_source_command(
     """
     Process source content using the source_graph workflow
     """
+    set_user_context(input_data.user_id)
     start_time = time.time()
 
     try:
@@ -166,6 +169,7 @@ class RunTransformationInput(CommandInput):
 
     source_id: str
     transformation_id: str
+    user_id: Optional[str] = None
 
 
 class RunTransformationOutput(CommandOutput):
@@ -209,6 +213,7 @@ async def run_transformation_command(
     - Uses exponential-jitter backoff (1-60s)
     - Does NOT retry permanent failures (ValueError for validation errors)
     """
+    set_user_context(input_data.user_id)
     start_time = time.time()
 
     try:
