@@ -417,7 +417,7 @@ wheels = [
 [[package]]
 name = "content-core"
 version = "1.14.1"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/AustinDevs/content-core.git?rev=notebooker#f423f1fad9e39f78c23f411f173744b42406f923" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "aiohttp" },
@@ -445,10 +445,6 @@ dependencies = [
     { name = "tenacity" },
     { name = "validators" },
     { name = "youtube-transcript-api" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/22/b3/7b2d7b8d4e0023b537dc74b4157b1c0c40656d2d79832d132296fdd1e2b6/content_core-1.14.1.tar.gz", hash = "sha256:5e2598d78dc4f1be601b4009a3a300c37d252f490b2719841b351cae28ab701b", size = 20737743, upload-time = "2026-01-30T01:48:31.472Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/d1/017d7f5a74a10471d327ace5d0e2cc11bc30400b0e2a01feaf5dad92a113/content_core-1.14.1-py3-none-any.whl", hash = "sha256:14df9b8b819376f7b9c25658368532367b453e21feb86ae77a43ae9a07161006", size = 186377, upload-time = "2026-01-30T01:48:29.872Z" },
 ]
 
 [[package]]
@@ -647,14 +643,10 @@ wheels = [
 [[package]]
 name = "esperanto"
 version = "2.19.4"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/AustinDevs/esperanto.git?rev=notebooker#c6ed04ec4621792d3b99ea638e0eca5fa81f3dce" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/85/8b4761f16675a11fcc3615186ae8fdbb4612b0a05fe54b9ec29176c7301d/esperanto-2.19.4.tar.gz", hash = "sha256:c52506b1c9ff877a8c8723745826589f064af93395fa38a20bb4ad1c6cc71184", size = 833497, upload-time = "2026-02-17T21:17:08.962Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/b4/32094bd554e8b8d574bc4ff6c25ec558f14da30244248e504eef9210250a/esperanto-2.19.4-py3-none-any.whl", hash = "sha256:af605d5f2e63382b2f4426fff97aee59f9e000dcd2d7ddebf94d9fd7199703e9", size = 202495, upload-time = "2026-02-17T21:17:10.083Z" },
 ]
 
 [[package]]
