@@ -136,6 +136,9 @@ full:
 api:
 	uv run --env-file .env run_api.py
 
+seed:
+	uv run --env-file .env python -m open_notebook.database.seeder
+
 .PHONY: worker worker-start worker-stop worker-restart
 
 worker: worker-start

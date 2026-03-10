@@ -107,6 +107,14 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Podcast profile migration encountered errors: {e}")
         # Non-fatal: profiles can be migrated manually via UI
 
+    # Seed default model assignments
+    try:
+        from open_notebook.database.seeder import seed_default_models
+
+        await seed_default_models()
+    except Exception as e:
+        logger.warning(f"Default model seeding encountered errors: {e}")
+
     logger.success("API initialization completed successfully")
 
     # Yield control to the application
