@@ -61,6 +61,12 @@ async def generate_podcast_command(
     Real podcast generation using podcast-creator library with Episode Profiles
     """
     set_user_context(input_data.user_id)
+
+    # Pre-load S3 credentials for this user before podcast generation
+    from open_notebook.utils.storage import ensure_s3_credentials_cached
+
+    await ensure_s3_credentials_cached()
+
     start_time = time.time()
 
     try:

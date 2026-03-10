@@ -1,4 +1,5 @@
 import operator
+import os
 from typing import Any, Dict, List, Optional
 
 from content_core import extract_content
@@ -14,6 +15,7 @@ from open_notebook.domain.content_settings import ContentSettings
 from open_notebook.domain.notebook import Asset, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.graphs.transformation import graph as transform_graph
+from open_notebook.utils.storage import download_to_temp_file
 
 
 class SourceState(TypedDict):
@@ -60,6 +62,19 @@ async def content_process(state: SourceState) -> dict:
     )
     content_state["output_format"] = "markdown"
 
+    # Handle S3 files — download to temp file for processing
+    original_s3_path = None
+    temp_file_path = None
+    file_path = content_state.get("file_path")
+
+    if file_path and file_path.startswith("s3://"):
+        logger.debug(f"Downloading S3 file for processing: {file_path}")
+        original_s3_path = file_path
+        temp_file_path = download_to_temp_file(file_path)
+        content_state["file_path"] = temp_file_path
+        content_state["delete_source"] = False
+        logger.debug(f"Downloaded S3 file to temp: {temp_file_path}")
+
     # Add model configurations from Default Models
     try:
         model_manager = ModelManager()
@@ -98,6 +113,17 @@ async def content_process(state: SourceState) -> dict:
         # Continue without custom models (content-core will use its defaults)
 
     processed_state = await extract_content(content_state)
+
+    # Clean up temp file from S3 download
+    if temp_file_path:
+        try:
+            os.unlink(temp_file_path)
+            logger.debug(f"Cleaned up temp file: {temp_file_path}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up temp file {temp_file_path}: {e}")
+        # Restore original S3 path in processed state
+        if original_s3_path:
+            processed_state.file_path = original_s3_path
 
     if not processed_state.content or not processed_state.content.strip():
         url = processed_state.url or ""
