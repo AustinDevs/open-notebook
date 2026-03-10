@@ -1,0 +1,2 @@
+-- Rollback migration 15: Remove s3_config table
+REMOVE TABLE s3_config;

@@ -67,6 +67,12 @@ async def process_source_command(
     Process source content using the source_graph workflow
     """
     set_user_context(input_data.user_id)
+
+    # Pre-load S3 credentials for this user before source graph runs
+    from open_notebook.utils.storage import ensure_s3_credentials_cached
+
+    await ensure_s3_credentials_cached()
+
     start_time = time.time()
 
     try:

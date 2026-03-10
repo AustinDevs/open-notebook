@@ -12,7 +12,7 @@ from fastapi import (
     Query,
     UploadFile,
 )
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from loguru import logger
 from surreal_commands import execute_command_sync
 
@@ -34,6 +34,14 @@ from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import Notebook, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import InvalidInputError
+from open_notebook.utils.storage import (
+    delete_file,
+    ensure_s3_credentials_cached,
+    file_exists,
+    get_file_stream,
+    is_s3_enabled,
+    upload_file as storage_upload_file,
+)
 
 router = APIRouter()
 
@@ -62,26 +70,30 @@ def generate_unique_filename(original_filename: str, upload_folder: str) -> str:
 
 
 async def save_uploaded_file(upload_file: UploadFile) -> str:
-    """Save uploaded file to uploads folder and return file path."""
+    """Save uploaded file to uploads folder (local or S3) and return file path."""
     if not upload_file.filename:
         raise ValueError("No filename provided")
 
-    # Generate unique filename
-    file_path = generate_unique_filename(upload_file.filename, UPLOADS_FOLDER)
+    # Pre-load S3 credentials for this request (no-op if already loaded)
+    await ensure_s3_credentials_cached()
+
+    # Generate unique filename for local path (used even for S3 as base path)
+    local_path = generate_unique_filename(upload_file.filename, UPLOADS_FOLDER)
 
     try:
-        # Save file
-        with open(file_path, "wb") as f:
-            content = await upload_file.read()
-            f.write(content)
+        content = await upload_file.read()
+        content_type = upload_file.content_type
 
-        logger.info(f"Saved uploaded file to: {file_path}")
-        return file_path
+        # Upload to storage (S3 or local based on config)
+        storage_path = storage_upload_file(content, local_path, content_type)
+
+        logger.info(f"Saved uploaded file to: {storage_path}")
+        return storage_path
     except Exception as e:
         logger.error(f"Failed to save uploaded file: {e}")
-        # Clean up partial file if it exists
-        if os.path.exists(file_path):
-            os.unlink(file_path)
+        # Clean up partial file if it exists (local only)
+        if os.path.exists(local_path):
+            os.unlink(local_path)
         raise
 
 
@@ -560,6 +572,9 @@ async def create_source_json(source_data: SourceCreate):
 
 
 async def _resolve_source_file(source_id: str) -> tuple[str, str]:
+    """Resolve source file path, supporting both local and S3 storage."""
+    await ensure_s3_credentials_cached()
+
     source = await Source.get(source_id)
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -568,6 +583,14 @@ async def _resolve_source_file(source_id: str) -> tuple[str, str]:
     if not file_path:
         raise HTTPException(status_code=404, detail="Source has no file to download")
 
+    # S3 paths are always allowed (no path traversal risk)
+    if file_path.startswith("s3://"):
+        if not file_exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found in S3")
+        filename = file_path.split("/")[-1] if "/" in file_path else "download"
+        return file_path, filename
+
+    # Local file path validation
     safe_root = os.path.realpath(UPLOADS_FOLDER)
     resolved_path = os.path.realpath(file_path)
 
@@ -589,6 +612,12 @@ def _is_source_file_available(source: Source) -> Optional[bool]:
         return None
 
     file_path = source.asset.file_path
+
+    # S3 files: check via storage utility
+    if file_path.startswith("s3://"):
+        return file_exists(file_path)
+
+    # Local files: path traversal check + existence
     safe_root = os.path.realpath(UPLOADS_FOLDER)
     resolved_path = os.path.realpath(file_path)
 
@@ -676,6 +705,17 @@ async def download_source_file(source_id: str):
     """Download the original file associated with an uploaded source."""
     try:
         resolved_path, filename = await _resolve_source_file(source_id)
+
+        # S3 files: stream from S3
+        if resolved_path.startswith("s3://"):
+            stream = get_file_stream(resolved_path)
+            return StreamingResponse(
+                stream,
+                media_type="application/octet-stream",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+
+        # Local files: serve directly
         return FileResponse(
             path=resolved_path,
             filename=filename,

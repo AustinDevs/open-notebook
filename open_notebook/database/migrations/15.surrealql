@@ -1,0 +1,11 @@
+-- Migration 15: Add s3_config table for per-user S3 storage configuration
+DEFINE TABLE s3_config SCHEMAFULL;
+DEFINE FIELD bucket_name ON s3_config TYPE option<string>;
+DEFINE FIELD region ON s3_config TYPE option<string>;
+DEFINE FIELD endpoint_url ON s3_config TYPE option<string>;
+DEFINE FIELD public_url ON s3_config TYPE option<string>;
+DEFINE FIELD use_path_style ON s3_config TYPE bool DEFAULT false;
+DEFINE FIELD access_key_id ON s3_config TYPE option<string>;
+DEFINE FIELD secret_access_key ON s3_config TYPE option<string>;
+DEFINE FIELD created ON s3_config TYPE option<datetime>;
+DEFINE FIELD updated ON s3_config TYPE option<datetime>;
