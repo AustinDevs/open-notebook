@@ -3,8 +3,9 @@ from typing import Any, Dict, Optional
 from fastapi import HTTPException
 from loguru import logger
 from pydantic import BaseModel
-from surreal_commands import get_command_status, submit_command
+from surreal_commands import get_command_status
 
+from api.command_service import user_aware_submit
 from open_notebook.domain.notebook import Notebook
 from open_notebook.podcasts.models import EpisodeProfile, PodcastEpisode, SpeakerProfile
 
@@ -92,8 +93,10 @@ class PodcastService:
                 logger.error(f"Failed to import podcast commands: {import_err}")
                 raise ValueError("Podcast commands not available")
 
-            # Submit command to surreal-commands
-            job_id = submit_command("open_notebook", "generate_podcast", command_args)
+            # Submit command to surreal-commands (with user context)
+            job_id = user_aware_submit(
+                "open_notebook", "generate_podcast", command_args
+            )
 
             # Convert RecordID to string if needed
             if not job_id:

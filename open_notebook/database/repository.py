@@ -1,4 +1,6 @@
+import hashlib
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, TypeVar, Union
@@ -44,6 +46,23 @@ def ensure_record_id(value: Union[str, RecordID]) -> RecordID:
     return RecordID.parse(value)
 
 
+def _get_database_name() -> str:
+    """Get the database name, routing to a per-user database if user context is set."""
+    try:
+        from api.auth import current_user_id
+
+        user_id = current_user_id.get()
+    except (ImportError, LookupError):
+        user_id = None
+
+    if user_id:
+        sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", user_id)
+        hash_suffix = hashlib.sha256(user_id.encode()).hexdigest()[:8]
+        return f"user_{sanitized}_{hash_suffix}"
+
+    return os.environ.get("SURREAL_DATABASE", "open_notebook")
+
+
 @asynccontextmanager
 async def db_connection():
     db = AsyncSurreal(get_database_url())
@@ -53,9 +72,7 @@ async def db_connection():
             "password": get_database_password(),
         }
     )
-    await db.use(
-        os.environ.get("SURREAL_NAMESPACE"), os.environ.get("SURREAL_DATABASE")
-    )
+    await db.use(os.environ.get("SURREAL_NAMESPACE"), _get_database_name())
     try:
         yield db
     finally:

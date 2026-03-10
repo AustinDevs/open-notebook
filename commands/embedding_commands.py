@@ -5,6 +5,7 @@ from loguru import logger
 from pydantic import BaseModel
 from surreal_commands import CommandInput, CommandOutput, command, submit_command
 
+from api.auth import current_user_id, set_user_context
 from open_notebook.ai.models import model_manager
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
 from open_notebook.exceptions import ConfigurationError
@@ -36,6 +37,7 @@ class RebuildEmbeddingsInput(CommandInput):
     include_sources: bool = True
     include_notes: bool = True
     include_insights: bool = True
+    user_id: Optional[str] = None
 
 
 class RebuildEmbeddingsOutput(CommandOutput):
@@ -61,6 +63,7 @@ class CreateInsightInput(CommandInput):
     source_id: str
     insight_type: str
     content: str
+    user_id: Optional[str] = None
 
 
 class CreateInsightOutput(CommandOutput):
@@ -76,6 +79,7 @@ class EmbedNoteInput(CommandInput):
     """Input for embedding a single note."""
 
     note_id: str
+    user_id: Optional[str] = None
 
 
 class EmbedNoteOutput(CommandOutput):
@@ -91,6 +95,7 @@ class EmbedInsightInput(CommandInput):
     """Input for embedding a single source insight."""
 
     insight_id: str
+    user_id: Optional[str] = None
 
 
 class EmbedInsightOutput(CommandOutput):
@@ -106,6 +111,7 @@ class EmbedSourceInput(CommandInput):
     """Input for embedding a source (creates multiple chunk embeddings)."""
 
     source_id: str
+    user_id: Optional[str] = None
 
 
 class EmbedSourceOutput(CommandOutput):
@@ -147,6 +153,7 @@ async def embed_note_command(input_data: EmbedNoteInput) -> EmbedNoteOutput:
     - Uses exponential-jitter backoff (1-60s)
     - Does NOT retry permanent failures (ValueError for validation errors)
     """
+    set_user_context(input_data.user_id)
     start_time = time.time()
 
     try:
@@ -239,6 +246,7 @@ async def embed_insight_command(input_data: EmbedInsightInput) -> EmbedInsightOu
     - Uses exponential-jitter backoff (1-60s)
     - Does NOT retry permanent failures (ValueError for validation errors)
     """
+    set_user_context(input_data.user_id)
     start_time = time.time()
 
     try:
@@ -336,6 +344,7 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
     - Uses exponential-jitter backoff (1-60s)
     - Does NOT retry permanent failures (ValueError for validation errors)
     """
+    set_user_context(input_data.user_id)
     start_time = time.time()
 
     try:
@@ -472,6 +481,7 @@ async def create_insight_command(
     - Uses exponential-jitter backoff (1-60s)
     - Does NOT retry permanent failures (ValueError for validation errors)
     """
+    set_user_context(input_data.user_id)
     start_time = time.time()
 
     try:
@@ -504,10 +514,13 @@ async def create_insight_command(
             raise ValueError("Failed to create insight - no ID in result")
 
         # 2. Submit embedding command (fire-and-forget)
+        embed_args: Dict[str, Any] = {"insight_id": insight_id}
+        if input_data.user_id:
+            embed_args["user_id"] = input_data.user_id
         submit_command(
             "open_notebook",
             "embed_insight",
-            {"insight_id": insight_id},
+            embed_args,
         )
         logger.debug(f"Submitted embed_insight command for {insight_id}")
 
@@ -639,6 +652,7 @@ async def rebuild_embeddings_command(
     - Retries disabled (retry=None) for this coordinator command
     - Individual embed_* commands handle their own retries
     """
+    set_user_context(input_data.user_id)
     start_time = time.time()
 
     try:
@@ -687,6 +701,11 @@ async def rebuild_embeddings_command(
         insights_submitted = 0
         failed_submissions = 0
 
+        # Build extra args for user context propagation
+        user_args: Dict[str, Any] = {}
+        if input_data.user_id:
+            user_args["user_id"] = input_data.user_id
+
         # Submit embed_source commands for sources
         logger.info(f"\nSubmitting {len(items['sources'])} source embedding jobs...")
         for idx, source_id in enumerate(items["sources"], 1):
@@ -694,7 +713,7 @@ async def rebuild_embeddings_command(
                 submit_command(
                     "open_notebook",
                     "embed_source",
-                    {"source_id": source_id},
+                    {"source_id": source_id, **user_args},
                 )
                 sources_submitted += 1
 
@@ -714,7 +733,7 @@ async def rebuild_embeddings_command(
                 submit_command(
                     "open_notebook",
                     "embed_note",
-                    {"note_id": note_id},
+                    {"note_id": note_id, **user_args},
                 )
                 notes_submitted += 1
 
@@ -734,7 +753,7 @@ async def rebuild_embeddings_command(
                 submit_command(
                     "open_notebook",
                     "embed_insight",
-                    {"insight_id": insight_id},
+                    {"insight_id": insight_id, **user_args},
                 )
                 insights_submitted += 1
 

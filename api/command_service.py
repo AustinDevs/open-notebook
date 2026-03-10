@@ -3,6 +3,28 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 from surreal_commands import get_command_status, submit_command
 
+from api.auth import current_user_id
+
+
+def _inject_user_id(command_args: Dict[str, Any]) -> Dict[str, Any]:
+    """Inject current user_id into command args if user context is set."""
+    try:
+        user_id = current_user_id.get()
+    except LookupError:
+        user_id = None
+
+    if user_id and "user_id" not in command_args:
+        command_args = {**command_args, "user_id": user_id}
+    return command_args
+
+
+def user_aware_submit(
+    module_name: str, command_name: str, command_args: Dict[str, Any]
+) -> Any:
+    """Submit a command with user_id automatically injected from context."""
+    command_args = _inject_user_id(command_args)
+    return submit_command(module_name, command_name, command_args)
+
 
 class CommandService:
     """Generic service layer for command operations"""
@@ -23,6 +45,9 @@ class CommandService:
             except ImportError as import_err:
                 logger.error(f"Failed to import command modules: {import_err}")
                 raise ValueError("Command modules not available")
+
+            # Inject user_id from current context
+            command_args = _inject_user_id(command_args)
 
             # surreal-commands expects: submit_command(app_name, command_name, args)
             cmd_id = submit_command(

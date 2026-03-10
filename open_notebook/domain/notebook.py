@@ -13,6 +13,19 @@ from open_notebook.domain.base import ObjectModel
 from open_notebook.exceptions import DatabaseOperationError, InvalidInputError
 
 
+def _user_context_args() -> dict:
+    """Get user_id args dict for command submission if user context is set."""
+    try:
+        from api.auth import current_user_id
+
+        user_id = current_user_id.get()
+        if user_id:
+            return {"user_id": user_id}
+    except (ImportError, LookupError):
+        pass
+    return {}
+
+
 class Notebook(ObjectModel):
     table_name: ClassVar[str] = "notebook"
     name: str
@@ -436,7 +449,7 @@ class Source(ObjectModel):
             command_id = submit_command(
                 "open_notebook",
                 "embed_source",
-                {"source_id": str(self.id)},
+                {"source_id": str(self.id), **_user_context_args()},
             )
 
             command_id_str = str(command_id)
@@ -491,6 +504,7 @@ class Source(ObjectModel):
                     "source_id": str(self.id),
                     "insight_type": insight_type,
                     "content": content,
+                    **_user_context_args(),
                 },
             )
             logger.info(
@@ -585,7 +599,7 @@ class Note(ObjectModel):
             command_id = submit_command(
                 "open_notebook",
                 "embed_note",
-                {"note_id": str(self.id)},
+                {"note_id": str(self.id), **_user_context_args()},
             )
             logger.debug(f"Submitted embed_note command {command_id} for {self.id}")
             return command_id
