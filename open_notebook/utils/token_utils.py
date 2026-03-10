@@ -11,26 +11,21 @@ from open_notebook.config import TIKTOKEN_CACHE_DIR
 # tokenizer encodings are cached persistently in the data folder
 os.environ["TIKTOKEN_CACHE_DIR"] = TIKTOKEN_CACHE_DIR
 
-
-def token_count(input_string: str) -> int:
-    """
-    Count the number of tokens in the input string using the 'o200k_base' encoding.
-
-    Args:
-        input_string (str): The input string to count tokens for.
-
-    Returns:
-        int: The number of tokens in the input string.
-    """
-    try:
-        import tiktoken
-
-        encoding = tiktoken.get_encoding("o200k_base")
-        tokens = encoding.encode(input_string)
-        return len(tokens)
-    except ImportError:
-        # Fallback: simple word count estimation
-        return int(len(input_string.split()) * 1.3)
+# Re-export from esperanto (source of truth for token/chunking logic)
+from esperanto.utils.token_utils import (  # noqa: E402, F401
+    DEFAULT_CONTEXT_LIMIT,
+    DEFAULT_OUTPUT_TOKENS,
+    OUTPUT_RATIO,
+    SAFETY_BUFFER,
+    batch_by_token_limit,
+    calculate_batch_token_limit,
+    calculate_output_buffer,
+    chunk_text_by_tokens,
+    get_context_limit_from_error,
+    is_context_limit_error,
+    parse_context_limit_error,
+    token_count,
+)
 
 
 def token_cost(token_count: int, cost_per_million: float = 0.150) -> float:
