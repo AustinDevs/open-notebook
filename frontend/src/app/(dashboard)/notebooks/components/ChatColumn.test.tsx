@@ -24,8 +24,6 @@ function createChatMock() {
   return {
     messages: [],
     isSending: false,
-    tokenCount: 0,
-    charCount: 0,
     sessions: [],
     currentSessionId: null,
   } as unknown as ReturnType<typeof useNotebookChat>

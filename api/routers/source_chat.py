@@ -438,10 +438,12 @@ async def stream_source_chat_response(
         user_event = {"type": "user_message", "content": message, "timestamp": None}
         yield f"data: {json.dumps(user_event)}\n\n"
 
-        # Execute source chat graph synchronously (like notebook chat does)
-        result = source_chat_graph.invoke(
-            input=state_values,  # type: ignore[arg-type]
-            config=RunnableConfig(
+        # Execute source chat graph in a thread to avoid blocking the event loop
+        # (blocking the loop would prevent SSE data from being flushed to the client)
+        result = await asyncio.to_thread(
+            source_chat_graph.invoke,
+            state_values,  # type: ignore[arg-type]
+            RunnableConfig(
                 configurable={"thread_id": session_id, "model_id": model_override}
             ),
         )

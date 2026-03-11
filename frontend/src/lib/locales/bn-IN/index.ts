@@ -27,6 +27,7 @@ export const bnIN = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "উৎস",
+    context: "প্রসঙ্গ",
     notebook: "নোটবুক",
     podcast: "পডকাস্ট",
     quickActions: "দ্রুত ক্রিয়া",
@@ -125,9 +126,11 @@ export const bnIN = {
     saveSuccess: "সফলভাবে সংরক্ষিত",
     contextModes: {
       off: "চ্যাটে অন্তর্ভুক্ত নয়",
-      insights: "শুধুমাত্র অন্তর্দৃষ্টি",
-      full: "সম্পূর্ণ কন্টেন্ট",
-      clickToCycle: "সাইকেল করতে ক্লিক করুন",
+      on: "চ্যাটে অন্তর্ভুক্ত",
+      clickToToggle: "টগল করতে ক্লিক করুন",
+      noContext:
+        "কোনো উৎস বা নোট প্রসঙ্গে অন্তর্ভুক্ত নেই। কার্ডের আইকনগুলি টগল করুন।",
+      inScope: "পরিসরে",
     },
     clickToEdit: "সম্পাদনা করতে ক্লিক করুন",
   },

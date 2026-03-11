@@ -216,10 +216,7 @@ export interface UpdateNotebookChatSessionRequest {
 export interface SendNotebookChatMessageRequest {
   session_id: string
   message: string
-  context: {
-    sources: Array<Record<string, unknown>>
-    notes: Array<Record<string, unknown>>
-  }
+  notebook_id?: string
   model_override?: string
 }
 

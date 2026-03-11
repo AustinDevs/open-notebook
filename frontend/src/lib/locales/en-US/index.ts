@@ -27,6 +27,7 @@ export const enUS = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "Source",
+    context: "Context",
     notebook: "Notebook",
     podcast: "Podcast",
     quickActions: "Quick actions",
@@ -125,9 +126,11 @@ export const enUS = {
     saveSuccess: "Saved successfully",
     contextModes: {
       off: "Not included in chat",
-      insights: "Insights only",
-      full: "Full content",
-      clickToCycle: "Click to cycle",
+      on: "Included in chat",
+      clickToToggle: "Click to toggle",
+      noContext:
+        "No sources or notes included in context. Toggle icons on cards to include them.",
+      inScope: "in scope",
     },
     clickToEdit: "Click to edit",
   },

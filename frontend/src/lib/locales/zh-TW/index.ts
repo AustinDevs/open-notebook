@@ -27,6 +27,7 @@ export const zhTW = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "來源",
+    context: "上下文",
     notebook: "筆記本",
     podcast: "播客",
     quickActions: "快捷操作",
@@ -125,9 +126,11 @@ export const zhTW = {
     saveSuccess: "儲存成功",
     contextModes: {
       off: "未包含在聊天中",
-      insights: "僅限見解",
-      full: "全部內容",
-      clickToCycle: "點擊循環切換",
+      on: "已包含在聊天中",
+      clickToToggle: "點擊切換",
+      noContext:
+        "未包含任何來源或筆記。切換卡片上的圖標以包含它們。",
+      inScope: "在範圍內",
     },
     clickToEdit: "點擊編輯",
   },

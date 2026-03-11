@@ -27,6 +27,7 @@ export const ruRU = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "Источник",
+    context: "Контекст",
     notebook: "Блокнот",
     podcast: "Подкаст",
     quickActions: "Быстрые действия",
@@ -125,9 +126,11 @@ export const ruRU = {
     saveSuccess: "Успешно сохранено",
     contextModes: {
       off: "Не включено в чат",
-      insights: "Только инсайты",
-      full: "Полное содержимое",
-      clickToCycle: "Нажмите для переключения",
+      on: "Включено в чат",
+      clickToToggle: "Нажмите для переключения",
+      noContext:
+        "Источники или заметки не включены в контекст. Переключите значки на карточках для включения.",
+      inScope: "в области",
     },
     clickToEdit: "Нажмите для редактирования",
   },

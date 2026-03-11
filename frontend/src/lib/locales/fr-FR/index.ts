@@ -27,6 +27,7 @@ export const frFR = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "Source",
+    context: "Contexte",
     notebook: "Carnet",
     podcast: "Podcast",
     quickActions: "Actions rapides",
@@ -125,9 +126,11 @@ export const frFR = {
     saveSuccess: "Enregistré avec succès",
     contextModes: {
       off: "Non inclus dans le chat",
-      insights: "Analyses uniquement",
-      full: "Contenu complet",
-      clickToCycle: "Cliquez pour faire défiler",
+      on: "Inclus dans le chat",
+      clickToToggle: "Cliquez pour basculer",
+      noContext:
+        "Aucune source ou note incluse dans le contexte. Activez les icônes sur les cartes pour les inclure.",
+      inScope: "dans le périmètre",
     },
     clickToEdit: "Cliquez pour modifier",
   },

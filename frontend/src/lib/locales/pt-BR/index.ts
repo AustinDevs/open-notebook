@@ -27,6 +27,7 @@ export const ptBR = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "Fonte",
+    context: "Contexto",
     notebook: "Caderno",
     podcast: "Podcast",
     quickActions: "Ações rápidas",
@@ -125,9 +126,11 @@ export const ptBR = {
     saveSuccess: "Salvo com sucesso",
     contextModes: {
       off: "Não incluído no chat",
-      insights: "Apenas insights",
-      full: "Conteúdo completo",
-      clickToCycle: "Clique para alternar",
+      on: "Incluído no chat",
+      clickToToggle: "Clique para alternar",
+      noContext:
+        "Nenhuma fonte ou nota incluída no contexto. Alterne os ícones nos cartões para incluí-los.",
+      inScope: "no escopo",
     },
     clickToEdit: "Clique para editar",
   },

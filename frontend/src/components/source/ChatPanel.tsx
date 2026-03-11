@@ -25,11 +25,8 @@ import { toast } from 'sonner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 
 interface NotebookContextStats {
-  sourcesInsights: number
-  sourcesFull: number
+  sourcesCount: number
   notesCount: number
-  tokenCount?: number
-  charCount?: number
 }
 
 interface ChatPanelProps {
@@ -268,11 +265,8 @@ export function ChatPanel({
         {/* Notebook Context Indicator */}
         {notebookContextStats && (
           <ContextIndicator
-            sourcesInsights={notebookContextStats.sourcesInsights}
-            sourcesFull={notebookContextStats.sourcesFull}
+            sourcesCount={notebookContextStats.sourcesCount}
             notesCount={notebookContextStats.notesCount}
-            tokenCount={notebookContextStats.tokenCount}
-            charCount={notebookContextStats.charCount}
           />
         )}
 

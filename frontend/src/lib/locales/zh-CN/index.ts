@@ -27,6 +27,7 @@ export const zhCN = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "来源",
+    context: "上下文",
     notebook: "笔记本",
     podcast: "播客",
     quickActions: "快捷操作",
@@ -125,9 +126,11 @@ export const zhCN = {
     saveSuccess: "保存成功",
     contextModes: {
       off: "未包含在聊天中",
-      insights: "仅限见解",
-      full: "全部内容",
-      clickToCycle: "点击循环切换",
+      on: "已包含在聊天中",
+      clickToToggle: "点击切换",
+      noContext:
+        "未包含任何来源或笔记。切换卡片上的图标以包含它们。",
+      inScope: "在范围内",
     },
     clickToEdit: "点击编辑",
   },

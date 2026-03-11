@@ -27,6 +27,7 @@ export const itIT = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "Fonte",
+    context: "Contesto",
     notebook: "Quaderno",
     podcast: "Podcast",
     quickActions: "Azioni rapide",
@@ -125,9 +126,11 @@ export const itIT = {
     saveSuccess: "Salvato con successo",
     contextModes: {
       off: "Non incluso nella chat",
-      insights: "Solo approfondimenti",
-      full: "Contenuto completo",
-      clickToCycle: "Clicca per cambiare",
+      on: "Incluso nella chat",
+      clickToToggle: "Clicca per cambiare",
+      noContext:
+        "Nessuna fonte o nota inclusa nel contesto. Attiva le icone sulle schede per includerle.",
+      inScope: "nell'ambito",
     },
     clickToEdit: "Clicca per modificare",
   },

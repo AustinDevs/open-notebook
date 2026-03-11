@@ -27,6 +27,7 @@ export const jaJP = {
     russian: "Русский",
     bengali: "বাংলা",
     source: "ソース",
+    context: "コンテキスト",
     notebook: "ノートブック",
     podcast: "ポッドキャスト",
     quickActions: "クイックアクション",
@@ -125,9 +126,11 @@ export const jaJP = {
     saveSuccess: "保存しました",
     contextModes: {
       off: "チャットに含めない",
-      insights: "インサイトのみ",
-      full: "全文",
-      clickToCycle: "クリックで切り替え",
+      on: "チャットに含める",
+      clickToToggle: "クリックで切り替え",
+      noContext:
+        "ソースやノートがコンテキストに含まれていません。カードのアイコンを切り替えて含めてください。",
+      inScope: "スコープ内",
     },
     clickToEdit: "クリックして編集",
   },

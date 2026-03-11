@@ -24,46 +24,30 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
   // Fetch notes for this notebook
   const { data: notes = [], isLoading: notesLoading } = useNotes(notebookId)
 
-  // Initialize notebook chat hook
-  const chat = useNotebookChat({
-    notebookId,
-    sources,
-    notes,
-    contextSelections
-  })
+  // Initialize notebook chat hook (no longer needs sources/notes/contextSelections)
+  const chat = useNotebookChat({ notebookId })
 
-  // Calculate context stats for indicator
+  // Calculate context stats for indicator (simple on/off counts)
   const contextStats = useMemo(() => {
-    let sourcesInsights = 0
-    let sourcesFull = 0
+    let sourcesCount = 0
     let notesCount = 0
 
-    // Count sources by mode
     sources.forEach(source => {
       const mode = contextSelections.sources[source.id]
-      if (mode === 'insights') {
-        sourcesInsights++
-      } else if (mode === 'full') {
-        sourcesFull++
+      if (mode === 'on') {
+        sourcesCount++
       }
     })
 
-    // Count notes that are included (not 'off')
     notes.forEach(note => {
       const mode = contextSelections.notes[note.id]
-      if (mode === 'full') {
+      if (mode === 'on') {
         notesCount++
       }
     })
 
-    return {
-      sourcesInsights,
-      sourcesFull,
-      notesCount,
-      tokenCount: chat.tokenCount,
-      charCount: chat.charCount
-    }
-  }, [sources, notes, contextSelections, chat.tokenCount, chat.charCount])
+    return { sourcesCount, notesCount }
+  }, [sources, notes, contextSelections])
 
   // Show loading state while sources/notes are being fetched
   if (sourcesLoading || notesLoading) {

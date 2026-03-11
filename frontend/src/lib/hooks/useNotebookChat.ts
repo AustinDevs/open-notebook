@@ -11,26 +11,18 @@ import {
   NotebookChatMessage,
   CreateNotebookChatSessionRequest,
   UpdateNotebookChatSessionRequest,
-  SourceListResponse,
-  NoteResponse
 } from '@/lib/types/api'
-import { ContextSelections } from '@/app/(dashboard)/notebooks/[id]/page'
 
 interface UseNotebookChatParams {
   notebookId: string
-  sources: SourceListResponse[]
-  notes: NoteResponse[]
-  contextSelections: ContextSelections
 }
 
-export function useNotebookChat({ notebookId, sources, notes, contextSelections }: UseNotebookChatParams) {
+export function useNotebookChat({ notebookId }: UseNotebookChatParams) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<NotebookChatMessage[]>([])
   const [isSending, setIsSending] = useState(false)
-  const [tokenCount, setTokenCount] = useState<number>(0)
-  const [charCount, setCharCount] = useState<number>(0)
   // Pending model override for when user changes model before a session exists
   const [pendingModelOverride, setPendingModelOverride] = useState<string | null>(null)
 
@@ -129,49 +121,6 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
     }
   })
 
-  // Build context from sources and notes based on user selections
-  const buildContext = useCallback(async () => {
-    // Build context_config mapping IDs to selection modes
-    const context_config: { sources: Record<string, string>, notes: Record<string, string> } = {
-      sources: {},
-      notes: {}
-    }
-
-    // Map source selections
-    sources.forEach(source => {
-      const mode = contextSelections.sources[source.id]
-      if (mode === 'insights') {
-        context_config.sources[source.id] = 'insights'
-      } else if (mode === 'full') {
-        context_config.sources[source.id] = 'full content'
-      } else {
-        context_config.sources[source.id] = 'not in'
-      }
-    })
-
-    // Map note selections
-    notes.forEach(note => {
-      const mode = contextSelections.notes[note.id]
-      if (mode === 'full') {
-        context_config.notes[note.id] = 'full content'
-      } else {
-        context_config.notes[note.id] = 'not in'
-      }
-    })
-
-    // Call API to build context with actual content
-    const response = await chatApi.buildContext({
-      notebook_id: notebookId,
-      context_config
-    })
-
-    // Store token and char counts
-    setTokenCount(response.token_count)
-    setCharCount(response.char_count)
-
-    return response.context
-  }, [notebookId, sources, notes, contextSelections])
-
   // Send message (synchronous, no streaming)
   const sendMessage = useCallback(async (message: string, modelOverride?: string) => {
     let sessionId = currentSessionId
@@ -213,12 +162,11 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
     setIsSending(true)
 
     try {
-      // Build context and send message
-      const context = await buildContext()
+      // Send message with notebook_id for server-side RAG retrieval
       const response = await chatApi.sendMessage({
         session_id: sessionId,
         message,
-        context,
+        notebook_id: notebookId,
         model_override: modelOverride ?? (currentSession?.model_override ?? undefined)
       })
 
@@ -241,7 +189,6 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
     currentSessionId,
     currentSession,
     pendingModelOverride,
-    buildContext,
     refetchCurrentSession,
     queryClient,
     t
@@ -287,18 +234,6 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
     }
   }, [currentSessionId, updateSessionMutation])
 
-  // Update token/char counts when context selections change
-  useEffect(() => {
-    const updateContextCounts = async () => {
-      try {
-        await buildContext()
-      } catch (error) {
-        console.error('Error updating context counts:', error)
-      }
-    }
-    updateContextCounts()
-  }, [buildContext])
-
   return {
     // State
     sessions,
@@ -307,8 +242,6 @@ export function useNotebookChat({ notebookId, sources, notes, contextSelections 
     messages,
     isSending,
     loadingSessions,
-    tokenCount,
-    charCount,
     pendingModelOverride,
 
     // Actions
