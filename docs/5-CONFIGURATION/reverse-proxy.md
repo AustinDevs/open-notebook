@@ -75,9 +75,11 @@ Caddy handles HTTPS automatically. The timeout settings ensure long-running oper
 ### Traefik
 
 ```yaml
+# Add this to your docker-compose.yml alongside the surrealdb service
+# See full base setup: https://github.com/lfnovo/open-notebook/blob/main/docker-compose.yml
 services:
   open-notebook:
-    image: lfnovo/open_notebook:v1-latest-single
+    image: lfnovo/open_notebook:v1-latest
     pull_policy: always
     environment:
       - API_URL=https://notebook.example.com
@@ -106,7 +108,7 @@ serversTransport:
 
 ### Coolify
 
-1. Create new service with `lfnovo/open_notebook:v1-latest-single`
+1. Create new service using [Docker Compose](../1-INSTALLATION/docker-compose.md)
 2. Set port to **8502**
 3. Add environment: `API_URL=https://your-domain.com`
 4. Enable HTTPS in Coolify
@@ -159,19 +161,20 @@ When `API_URL` is not set, the Next.js frontend:
 
 ## Complete Docker Compose Example
 
+> **Note:** This example only shows the open-notebook and nginx services. You also need a `surrealdb` service. See the [full base docker-compose.yml](https://github.com/lfnovo/open-notebook/blob/main/docker-compose.yml) for the complete setup.
+
 ```yaml
 services:
   open-notebook:
-    image: lfnovo/open_notebook:v1-latest-single
+    image: lfnovo/open_notebook:v1-latest
     pull_policy: always
     container_name: open-notebook
     environment:
       - API_URL=https://notebook.example.com
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY}
       - OPEN_NOTEBOOK_PASSWORD=${OPEN_NOTEBOOK_PASSWORD}
     volumes:
       - ./notebook_data:/app/data
-      - ./surreal_data:/mydata
     # Only expose to localhost (nginx handles public access)
     ports:
       - "127.0.0.1:8502:8502"
@@ -304,9 +307,10 @@ API_URL=http://192.168.1.100:5055
 
 **Step 3: Expose ports**
 ```yaml
+# Add to your docker-compose.yml (requires surrealdb service, see installation guide)
 services:
   open-notebook:
-    image: lfnovo/open_notebook:v1-latest-single
+    image: lfnovo/open_notebook:v1-latest
     pull_policy: always
     environment:
       - API_URL=http://192.168.1.100:5055
@@ -334,13 +338,14 @@ Host the API and frontend on different subdomains:
 
 **docker-compose.yml:**
 ```yaml
+# Add to your docker-compose.yml (requires surrealdb service, see installation guide)
 services:
   open-notebook:
-    image: lfnovo/open_notebook:v1-latest-single
+    image: lfnovo/open_notebook:v1-latest
     pull_policy: always
     environment:
       - API_URL=https://api.notebook.example.com
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY}
     # Don't expose ports (nginx handles routing)
 ```
 
@@ -409,7 +414,7 @@ services:
     image: lfnovo/open_notebook_api:v1-latest
     pull_policy: always
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY}
     ports:
       - "5055:5055"
     depends_on:
@@ -465,7 +470,7 @@ http {
 }
 ```
 
-**Note**: Most users should use the single-container approach (`v1-latest-single`). Multi-container is only needed for custom scaling or isolation requirements.
+**Note**: Most users should use the [Docker Compose](../1-INSTALLATION/docker-compose.md) approach (`v1-latest`). Multi-container with separate nginx is only needed for custom scaling or isolation requirements.
 
 ---
 
@@ -616,7 +621,7 @@ You'll see which API URL is being used
 curl https://your-domain.com/api/config
 
 # Expected output:
-{"openai_api_key_set":true,"anthropic_api_key_set":false,...}
+{"status":"ok","credentials_configured":true,...}
 ```
 
 **Step 3: Check Docker logs**

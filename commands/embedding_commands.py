@@ -7,6 +7,7 @@ from surreal_commands import CommandInput, CommandOutput, command, submit_comman
 
 from open_notebook.ai.models import model_manager
 from open_notebook.database.repository import ensure_record_id, repo_insert, repo_query
+from open_notebook.exceptions import ConfigurationError
 from open_notebook.domain.notebook import Note, Source, SourceInsight
 from open_notebook.utils.chunking import ContentType, chunk_text, detect_content_type
 from open_notebook.utils.embedding import generate_embedding, generate_embeddings
@@ -125,7 +126,7 @@ class EmbedSourceOutput(CommandOutput):
         "wait_strategy": "exponential_jitter",
         "wait_min": 1,
         "wait_max": 60,
-        "stop_on": [ValueError],  # Don't retry validation errors
+        "stop_on": [ValueError, ConfigurationError],  # Don't retry validation/config errors
         "retry_log_level": "debug",
     },
 )
@@ -217,7 +218,7 @@ async def embed_note_command(input_data: EmbedNoteInput) -> EmbedNoteOutput:
         "wait_strategy": "exponential_jitter",
         "wait_min": 1,
         "wait_max": 60,
-        "stop_on": [ValueError],  # Don't retry validation errors
+        "stop_on": [ValueError, ConfigurationError],  # Don't retry validation/config errors
         "retry_log_level": "debug",
     },
 )
@@ -311,7 +312,7 @@ async def embed_insight_command(input_data: EmbedInsightInput) -> EmbedInsightOu
         "wait_strategy": "exponential_jitter",
         "wait_min": 1,
         "wait_max": 60,
-        "stop_on": [ValueError],  # Don't retry validation errors
+        "stop_on": [ValueError, ConfigurationError],  # Don't retry validation/config errors
         "retry_log_level": "debug",
     },
 )
@@ -327,7 +328,7 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
     2. DELETE existing source_embedding records for this source
     3. Detect content type from file path or content
     4. Chunk text using appropriate splitter
-    5. Generate embeddings for all chunks in a single API call
+    5. Generate embeddings for all chunks in batches
     6. Bulk INSERT source_embedding records
 
     Retry Strategy:
@@ -376,7 +377,7 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
         if total_chunks == 0:
             raise ValueError("No chunks created after splitting text")
 
-        # 5. Generate embeddings for all chunks in single API call
+        # 5. Generate embeddings for all chunks in batches
         cmd_id = get_command_id(input_data)
         logger.debug(f"Generating embeddings for {total_chunks} chunks")
         embeddings = await generate_embeddings(chunks, command_id=cmd_id)
@@ -447,7 +448,7 @@ async def embed_source_command(input_data: EmbedSourceInput) -> EmbedSourceOutpu
         "wait_strategy": "exponential_jitter",
         "wait_min": 1,
         "wait_max": 60,
-        "stop_on": [ValueError],  # Don't retry validation errors
+        "stop_on": [ValueError, ConfigurationError],  # Don't retry validation/config errors
         "retry_log_level": "debug",
     },
 )

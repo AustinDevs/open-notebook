@@ -119,8 +119,8 @@ export default function NotebookPage() {
     return (
       <AppShell>
         <div className="p-6">
-          <h1 className="text-2xl font-bold mb-4">{t.notebooks.notFound}</h1>
-          <p className="text-muted-foreground">{t.notebooks.notFoundDesc}</p>
+          <h1 className="text-2xl font-bold mb-4">{t('notebooks.notFound')}</h1>
+          <p className="text-muted-foreground">{t('notebooks.notFoundDesc')}</p>
         </div>
       </AppShell>
     )
@@ -142,15 +142,15 @@ export default function NotebookPage() {
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="sources" className="gap-2">
                       <FileText className="h-4 w-4" />
-                      {t.navigation.sources}
+                      {t('navigation.sources')}
                     </TabsTrigger>
                     <TabsTrigger value="notes" className="gap-2">
                       <StickyNote className="h-4 w-4" />
-                      {t.common.notes}
+                      {t('common.notes')}
                     </TabsTrigger>
                     <TabsTrigger value="chat" className="gap-2">
                       <MessageSquare className="h-4 w-4" />
-                      {t.common.chat}
+                      {t('common.chat')}
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -185,6 +185,8 @@ export default function NotebookPage() {
                   <ChatColumn
                     notebookId={notebookId}
                     contextSelections={contextSelections}
+                    sources={sources}
+                    sourcesLoading={sourcesLoading}
                   />
                 )}
               </div>
@@ -230,10 +232,12 @@ export default function NotebookPage() {
             </div>
 
             {/* Chat Column - always expanded, takes remaining space */}
-            <div className="transition-all duration-150 flex-1 lg:pr-6 lg:-mr-6">
+            <div className="transition-all duration-150 flex-1 min-w-0 lg:pr-6 lg:-mr-6">
               <ChatColumn
                 notebookId={notebookId}
                 contextSelections={contextSelections}
+                sources={sources}
+                sourcesLoading={sourcesLoading}
               />
             </div>
           </div>

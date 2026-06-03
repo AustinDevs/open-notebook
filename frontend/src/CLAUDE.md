@@ -64,8 +64,8 @@ User interactions trigger mutations/queries via hooks, which communicate with th
 #### `lib/locales/` — Internationalization (i18n)
 - **Locale files** (`en-US/`, `pt-BR/`, `zh-CN/`, `zh-TW/`, `ja-JP/`): Translation strings organized by feature
 - **`i18n.ts`**: i18next configuration with language detection
-- **`use-translation.ts`**: Custom hook with Proxy-based `t.section.key` access pattern
-- **Pattern**: Components call `useTranslation()` hook; access strings via `t.common.save`, `t.notebooks.title`
+- **`use-translation.ts`**: Thin wrapper around react-i18next's `useTranslation` with language change events
+- **Pattern**: Components call `useTranslation()` hook; access strings via `t('common.save')`, `t('notebooks.title')`
 
 ## Data & Control Flow Walkthrough
 
@@ -113,6 +113,7 @@ User interactions trigger mutations/queries via hooks, which communicate with th
 
 ### Error Handling
 - **API errors**: All request failures propagate to consuming code; components show toast notifications
+- **Error message resolution** (`lib/utils/error-handler.ts`): `getApiErrorMessage()` tries i18n mapping first via `ERROR_MAP`, then falls back to displaying the backend's descriptive error message directly. This ensures user-friendly error messages from the error classification system are shown as-is.
 - **Toast feedback**: Mutations show success/error toasts (from `sonner` library)
 - **Error boundary**: App-level error boundary catches React render errors; shows fallback UI
 

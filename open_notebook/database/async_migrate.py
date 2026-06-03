@@ -106,6 +106,18 @@ class AsyncMigrationManager:
             AsyncMigration.from_file("open_notebook/database/migrations/8.surrealql"),
             AsyncMigration.from_file("open_notebook/database/migrations/9.surrealql"),
             AsyncMigration.from_file("open_notebook/database/migrations/10.surrealql"),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/11.surrealql"
+            ),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/12.surrealql"
+            ),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/13.surrealql"
+            ),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/14.surrealql"
+            ),
         ]
         self.down_migrations = [
             AsyncMigration.from_file(
@@ -137,6 +149,18 @@ class AsyncMigrationManager:
             ),
             AsyncMigration.from_file(
                 "open_notebook/database/migrations/10_down.surrealql"
+            ),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/11_down.surrealql"
+            ),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/12_down.surrealql"
+            ),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/13_down.surrealql"
+            ),
+            AsyncMigration.from_file(
+                "open_notebook/database/migrations/14_down.surrealql"
             ),
         ]
         self.runner = AsyncMigrationRunner(
@@ -199,7 +223,8 @@ async def bump_version() -> None:
     new_version = current_version + 1
 
     await repo_query(
-        f"CREATE _sbl_migrations:{new_version} SET version = {new_version}, applied_at = time::now();",
+        "CREATE type::thing('_sbl_migrations', $version) SET version = $version, applied_at = time::now();",
+        {"version": new_version},
     )
 
 
@@ -207,4 +232,7 @@ async def lower_version() -> None:
     """Lower the version by removing the latest entry from migrations table."""
     current_version = await get_latest_version()
     if current_version > 0:
-        await repo_query(f"DELETE _sbl_migrations:{current_version};")
+        await repo_query(
+            "DELETE type::thing('_sbl_migrations', $version);",
+            {"version": current_version},
+        )

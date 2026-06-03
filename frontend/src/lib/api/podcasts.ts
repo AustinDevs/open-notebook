@@ -4,6 +4,7 @@ import {
   PodcastEpisode,
   EpisodeProfile,
   SpeakerProfile,
+  Language,
   PodcastGenerationRequest,
   PodcastGenerationResponse,
   InteractivePodcastRequest,
@@ -39,6 +40,13 @@ export const podcastsApi = {
 
   deleteEpisode: async (episodeId: string) => {
     await apiClient.delete(`/podcasts/episodes/${episodeId}`)
+  },
+
+  retryEpisode: async (episodeId: string) => {
+    const response = await apiClient.post<{ job_id: string; message: string }>(
+      `/podcasts/episodes/${episodeId}/retry`
+    )
+    return response.data
   },
 
   listEpisodeProfiles: async () => {
@@ -113,12 +121,8 @@ export const podcastsApi = {
     return response.data
   },
 
-  // Interactive podcast methods
-  askQuestion: async (episodeId: string, request: InteractivePodcastRequest) => {
-    const response = await apiClient.post<InteractivePodcastResponse>(
-      `/podcasts/episodes/${episodeId}/ask`,
-      request
-    )
+  listLanguages: async () => {
+    const response = await apiClient.get<Language[]>('/languages')
     return response.data
   },
 }

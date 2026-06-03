@@ -2,6 +2,8 @@
 
 Get Open Notebook running with **100% local AI** using Ollama. No cloud API keys needed, completely private.
 
+**Already have Ollama installed?** See [External Ollama Guide](quick-start-external-ollama.md) instead.
+
 ## Prerequisites
 
 1. **Docker Desktop** installed
@@ -14,10 +16,10 @@ Get Open Notebook running with **100% local AI** using Ollama. No cloud API keys
 
 ## Step 1: Choose Your Setup (1 min)
 
-### 🏠 Local Machine (Same Computer)
+### Local Machine (Same Computer)
 Everything runs on your machine. Recommended for testing/learning.
 
-### 🌐 Remote Server (Raspberry Pi, NAS, Cloud VM)
+### Remote Server (Raspberry Pi, NAS, Cloud VM)
 Run on a different computer, access from another. Needs network configuration.
 
 ---
@@ -32,20 +34,21 @@ services:
   surrealdb:
     image: surrealdb/surrealdb:v2
     command: start --user root --pass password --bind 0.0.0.0:8000 rocksdb:/mydata/mydatabase.db
+    user: root
     ports:
       - "8000:8000"
     volumes:
       - ./surreal_data:/mydata
 
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest-single
+    image: lfnovo/open_notebook:v1-latest
     pull_policy: always
     ports:
       - "8502:8502"  # Web UI (React frontend)
       - "5055:5055"  # API (required!)
     environment:
-      # NO API KEYS NEEDED - Using Ollama (free, local)
-      - OLLAMA_API_BASE=http://ollama:11434
+      # Encryption key for credential storage (required)
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
 
       # Database (required)
       - SURREAL_URL=ws://surrealdb:8000/rpc
@@ -55,7 +58,6 @@ services:
       - SURREAL_DATABASE=open_notebook
     volumes:
       - ./notebook_data:/app/data
-      - ./surreal_data:/mydata
     depends_on:
       - surrealdb
     restart: always
@@ -66,14 +68,20 @@ services:
       - "11434:11434"
     volumes:
       - ./ollama_models:/root/.ollama
-    environment:
-      # Optional: set GPU support if available
-      - OLLAMA_NUM_GPU=0
     restart: always
+    # Optional: set GPU support if available
+    #deploy:
+    #  resources:
+    #    reservations:
+    #      devices:
+    #        - driver: nvidia
+    #          count: 1
+    #          capabilities: [gpu]
 
 ```
 
-**That's it!** No API keys, no secrets, completely private.
+**Edit the file:**
+- Replace `change-me-to-a-secret-string` with your own secret (any string works)
 
 ---
 
@@ -95,13 +103,13 @@ Ollama needs at least one language model. Pick one:
 
 ```bash
 # Fastest & smallest (recommended for testing)
-docker exec open_notebook-ollama-1 ollama pull mistral
+docker exec open-notebook-local-ollama-1 ollama pull mistral
 
 # OR: Better quality but slower
-docker exec open_notebook-ollama-1 ollama pull neural-chat
+docker exec open-notebook-local-ollama-1 ollama pull neural-chat
 
 # OR: Even better quality, more VRAM needed
-docker exec open_notebook-ollama-1 ollama pull llama2
+docker exec open-notebook-local-ollama-1 ollama pull llama2
 ```
 
 This downloads the model (will take 1-5 minutes depending on your internet).
@@ -119,9 +127,22 @@ You should see the Open Notebook interface.
 
 ---
 
-## Step 6: Configure Local Model (1 min)
+## Step 6: Configure Ollama Provider (1 min)
 
-1. Click **Settings** (top right) → **Models**
+1. Go to **Settings** → **API Keys**
+2. Click **Add Credential**
+3. Select provider: **Ollama**
+4. Give it a name (e.g., "Local Ollama")
+5. Enter the base URL: `http://ollama:11434`
+6. Click **Save**
+7. Click **Test Connection** — should show success
+8. Click **Discover Models** → **Register Models**
+
+---
+
+## Step 7: Configure Local Model (1 min)
+
+1. Go to **Settings** → **Models**
 2. Set:
    - **Language Model**: `ollama/mistral` (or whichever model you downloaded)
    - **Embedding Model**: `ollama/nomic-embed-text` (auto-downloads if missing)
@@ -129,7 +150,7 @@ You should see the Open Notebook interface.
 
 ---
 
-## Step 7: Create Your First Notebook (1 min)
+## Step 8: Create Your First Notebook (1 min)
 
 1. Click **New Notebook**
 2. Name: "My Private Research"
@@ -137,7 +158,7 @@ You should see the Open Notebook interface.
 
 ---
 
-## Step 8: Add Local Content (1 min)
+## Step 9: Add Local Content (1 min)
 
 1. Click **Add Source**
 2. Choose **Text**
@@ -146,7 +167,7 @@ You should see the Open Notebook interface.
 
 ---
 
-## Step 9: Chat With Your Content (1 min)
+## Step 10: Chat With Your Content (1 min)
 
 1. Go to **Chat**
 2. Type: "What did you learn from this?"
@@ -159,20 +180,21 @@ You should see the Open Notebook interface.
 
 - [ ] Docker is running
 - [ ] You can access `http://localhost:8502`
-- [ ] Models are configured
+- [ ] Ollama credential is configured and tested
+- [ ] Models are registered
 - [ ] You created a notebook
 - [ ] Chat works with local model
 
-**All checked?** 🎉 You have a completely **private, offline** research assistant!
+**All checked?** You have a completely **private, offline** research assistant!
 
 ---
 
 ## Advantages of Local Setup
 
-✅ **No API costs** - Free forever
-✅ **No internet required** - True offline capability
-✅ **Privacy first** - Your data never leaves your machine
-✅ **No subscriptions** - No monthly bills
+- **No API costs** - Free forever
+- **No internet required** - True offline capability
+- **Privacy first** - Your data never leaves your machine
+- **No subscriptions** - No monthly bills
 
 **Trade-off:** Slower than cloud models (depends on your CPU/GPU)
 
@@ -209,10 +231,9 @@ docker compose up -d
 Check if GPU is available:
 ```bash
 # Show available GPUs
-docker exec open_notebook-ollama-1 ollama ps
+docker exec open-notebook-local-ollama-1 ollama ps
 
-# Enable GPU in docker-compose.yml:
-# - OLLAMA_NUM_GPU=1
+# Enable GPU in docker-compose.yml
 ```
 
 Then restart: `docker compose restart ollama`
@@ -221,10 +242,10 @@ Then restart: `docker compose restart ollama`
 
 ```bash
 # List available models
-docker exec open_notebook-ollama-1 ollama list
+docker exec open-notebook-local-ollama-1 ollama list
 
 # Pull additional model
-docker exec open_notebook-ollama-1 ollama pull neural-chat
+docker exec open-notebook-local-ollama-1 ollama pull neural-chat
 ```
 
 ---
@@ -239,8 +260,6 @@ docker exec open_notebook-ollama-1 ollama pull neural-chat
 4. **Scale Up**: Deploy to a server with better hardware for faster responses
 5. **Benchmark Models**: Try different models to find the speed/quality tradeoff you prefer
 
----
-
 ## Alternative: Using LM Studio Instead of Ollama
 
 **Prefer a GUI?** LM Studio is easier for non-technical users:
@@ -248,13 +267,12 @@ docker exec open_notebook-ollama-1 ollama pull neural-chat
 1. Download LM Studio: https://lmstudio.ai
 2. Open the app, download a model from the library
 3. Go to "Local Server" tab, start server (port 1234)
-4. Update your docker-compose.yml:
-   ```yaml
-   environment:
-     - OPENAI_COMPATIBLE_BASE_URL=http://host.docker.internal:1234/v1
-     - OPENAI_COMPATIBLE_API_KEY=not-needed
-   ```
-5. Configure in Settings → Models → Select your LM Studio model
+4. In Open Notebook, go to **Settings** → **API Keys**
+5. Click **Add Credential** → Select **OpenAI-Compatible**
+6. Enter base URL: `http://host.docker.internal:1234/v1`
+7. Enter API key: `lm-studio` (placeholder)
+8. Click **Save**, then **Test Connection**
+9. Configure in Settings → Models → Select your LM Studio model
 
 **Note**: LM Studio runs outside Docker, use `host.docker.internal` to connect.
 
@@ -264,10 +282,10 @@ docker exec open_notebook-ollama-1 ollama pull neural-chat
 
 - **Switch models**: Change in Settings → Models anytime
 - **Add more models**:
-  - Ollama: Run `ollama pull <model>`
+  - Ollama: Run `ollama pull <model>`, then re-discover models from the credential
   - LM Studio: Download from the app library
 - **Deploy to server**: Same docker-compose.yml works anywhere
-- **Use cloud hybrid**: Keep some local models, add OpenAI/Anthropic for complex tasks
+- **Use cloud hybrid**: Keep some local models, add cloud provider credentials for complex tasks
 
 ---
 

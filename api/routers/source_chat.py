@@ -155,7 +155,9 @@ async def get_source_chat_sessions(source_id: str = Path(..., description="Sourc
             if session_id_raw:
                 session_id = str(session_id_raw)
 
-                session_result = await repo_query(f"SELECT * FROM {session_id_raw}")
+                session_result = await repo_query(
+                    "SELECT * FROM $id", {"id": ensure_record_id(session_id)}
+                )
                 if session_result and len(session_result) > 0:
                     session_data = session_result[0]
 
@@ -470,8 +472,11 @@ async def stream_source_chat_response(
         yield f"data: {json.dumps(completion_event)}\n\n"
 
     except Exception as e:
+        from open_notebook.utils.error_classifier import classify_error
+
+        _, user_message = classify_error(e)
         logger.error(f"Error in source chat streaming: {str(e)}")
-        error_event = {"type": "error", "message": str(e)}
+        error_event = {"type": "error", "message": user_message}
         yield f"data: {json.dumps(error_event)}\n\n"
 
 

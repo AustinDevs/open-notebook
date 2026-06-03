@@ -131,6 +131,7 @@ doc_exports/
 
 specs/
 .claude
+.sisyphus
 
 .playwright-mcp/
 
@@ -138,3 +139,6 @@ specs/
 
 *.local.yml
 **/*.local.md
+.harness/
+
+.mcp.json

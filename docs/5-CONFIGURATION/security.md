@@ -4,6 +4,65 @@ Protect your Open Notebook deployment with password authentication and productio
 
 ---
 
+## API Key Encryption
+
+Open Notebook encrypts API keys stored in the database using Fernet symmetric encryption (AES-128-CBC with HMAC-SHA256).
+
+### Configuration Methods
+
+| Method | Documentation |
+|--------|---------------|
+| **Settings UI** | [API Configuration Guide](../3-USER-GUIDE/api-configuration.md) |
+| **Environment Variables** | This page (below) |
+
+### Setup
+
+Set the encryption key to any secret string:
+
+```bash
+# .env or docker.env
+OPEN_NOTEBOOK_ENCRYPTION_KEY=my-secret-passphrase
+```
+
+Any string works — it will be securely derived via SHA-256 internally. Use a strong passphrase for production deployments.
+
+### Default Credentials
+
+| Setting | Default | Security Level |
+|---------|---------|----------------|
+| Password | `open-notebook-change-me` | Development only |
+| Encryption Key | **None** (must be configured) | Required for API key storage |
+
+**The encryption key has no default.** You must set `OPEN_NOTEBOOK_ENCRYPTION_KEY` before using the API key configuration feature. Without it, encrypting/decrypting API keys will fail.
+
+### Docker Secrets Support
+
+Both settings support Docker secrets via `_FILE` suffix:
+
+```yaml
+environment:
+  - OPEN_NOTEBOOK_PASSWORD_FILE=/run/secrets/app_password
+  - OPEN_NOTEBOOK_ENCRYPTION_KEY_FILE=/run/secrets/encryption_key
+```
+
+### Security Notes
+
+| Scenario | Behavior |
+|----------|----------|
+| Key configured | API keys encrypted with your key |
+| No key configured | Encryption/decryption will fail (key is required) |
+| Key changed | Old encrypted keys become unreadable |
+| Legacy data | Unencrypted keys still work (graceful fallback) |
+
+### Key Management
+
+- **Keep secret**: Never commit the encryption key to version control
+- **Backup securely**: Store the key separately from database backups
+- **No rotation yet**: Changing the key requires re-saving all API keys
+- **Per-deployment**: Each instance should have its own encryption key
+
+---
+
 ## When to Use Password Protection
 
 ### Use it for:
@@ -23,13 +82,13 @@ Protect your Open Notebook deployment with password authentication and productio
 ### Docker Deployment
 
 ```yaml
-# docker-compose.yml
+# Add to your docker-compose.yml (requires surrealdb service, see installation guide)
 services:
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest-single
+    image: lfnovo/open_notebook:v1-latest
     pull_policy: always
     environment:
-      - OPENAI_API_KEY=sk-...
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=your-secret-encryption-key
       - OPEN_NOTEBOOK_PASSWORD=your_secure_password
     # ... rest of config
 ```
@@ -38,9 +97,11 @@ Or using environment file:
 
 ```bash
 # docker.env
-OPENAI_API_KEY=sk-...
+OPEN_NOTEBOOK_ENCRYPTION_KEY=your-secret-encryption-key
 OPEN_NOTEBOOK_PASSWORD=your_secure_password
 ```
+
+> **Important**: The encryption key is **required** for credential storage. Without it, you cannot save AI provider credentials via the Settings UI. If you change or lose the encryption key, all stored credentials become unreadable.
 
 ### Development Setup
 
@@ -184,9 +245,10 @@ async function getNotebooks() {
 ### Docker Security
 
 ```yaml
+# Add to your docker-compose.yml (requires surrealdb service, see installation guide)
 services:
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest-single
+    image: lfnovo/open_notebook:v1-latest
     pull_policy: always
     ports:
       - "127.0.0.1:8502:8502"  # Bind to localhost only
@@ -224,6 +286,31 @@ iptables -A INPUT -p tcp --dport 5055 -j DROP
 ### Reverse Proxy with SSL
 
 See [Reverse Proxy Configuration](reverse-proxy.md) for complete nginx/Caddy/Traefik setup with HTTPS.
+
+### CORS Origins
+
+The API accepts cross-origin requests from any origin by default (`*`). This is convenient for development and diverse self-hosted setups, but it's not recommended for internet-facing production deployments because any website the user visits can issue authenticated cross-origin requests to your API.
+
+When `CORS_ORIGINS` is not set, the API logs a startup warning prompting you to configure it.
+
+**For production, set `CORS_ORIGINS` to your frontend's actual origin(s):**
+
+```bash
+# Single origin
+CORS_ORIGINS=https://notebook.example.com
+
+# Multiple origins (comma-separated)
+CORS_ORIGINS=https://notebook.example.com,https://admin.example.com
+```
+
+**Guidelines:**
+
+- Always use HTTPS origins in production.
+- List only the exact origins that should be allowed to call the API.
+- Include the scheme and port (if non-default): `https://example.com`, `http://192.168.1.10:3000`.
+- Changes require an API restart to take effect.
+
+**Error responses** (401, 404, 500, etc.) also respect the configured origins — they only include `Access-Control-Allow-Origin` for allowed origins, so error bodies are not leaked cross-origin when `CORS_ORIGINS` is configured.
 
 ---
 
