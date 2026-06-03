@@ -89,7 +89,7 @@ export function ChatPanel({
       // The modal component itself will handle displaying "not found" states.
       // This try-catch is here for future enhancements or unexpected errors.
     } catch {
-      toast.error(t.common.noResults)
+      toast.error(t('common.noResults'))
     }
   }
 
@@ -127,7 +127,7 @@ export function ChatPanel({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
-            {title || (contextType === 'source' ? t.chat.chatWith.replace('{name}', t.navigation.sources) : t.chat.chatWith.replace('{name}', t.common.notebook))}
+            {title || (contextType === 'source' ? t('chat.chatWith').replace('{name}', t('navigation.sources')) : t('chat.chatWith').replace('{name}', t('common.notebook')))}
           </CardTitle>
           {onSelectSession && onCreateSession && onDeleteSession && (
             <Dialog open={sessionManagerOpen} onOpenChange={setSessionManagerOpen}>
@@ -139,10 +139,10 @@ export function ChatPanel({
                 disabled={loadingSessions}
               >
                 <Clock className="h-4 w-4" />
-                <span className="text-xs">{t.chat.sessions}</span>
+                <span className="text-xs">{t('chat.sessions')}</span>
               </Button>
               <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden">
-                <DialogTitle className="sr-only">{t.chat.sessionsTitle}</DialogTitle>
+                <DialogTitle className="sr-only">{t('chat.sessionsTitle')}</DialogTitle>
                 <SessionManager
                   sessions={sessions}
                   currentSessionId={currentSessionId ?? null}
@@ -167,9 +167,9 @@ export function ChatPanel({
               <div className="text-center text-muted-foreground py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-sm">
-                  {t.chat.startConversation.replace('{type}', contextType === 'source' ? t.navigation.sources : t.common.notebook)}
+                  {t('chat.startConversation').replace('{type}', contextType === 'source' ? t('navigation.sources') : t('common.notebook'))}
                 </p>
-                <p className="text-xs mt-2">{t.chat.askQuestions}</p>
+                <p className="text-xs mt-2">{t('chat.askQuestions')}</p>
               </div>
             ) : (
               messages.map((message) => (
@@ -243,19 +243,19 @@ export function ChatPanel({
               {contextIndicators.sources?.length > 0 && (
                 <Badge variant="outline" className="gap-1">
                   <FileText className="h-3 w-3" />
-                  {contextIndicators.sources.length} {t.navigation.sources}
+                  {contextIndicators.sources.length} {t('navigation.sources')}
                 </Badge>
               )}
               {contextIndicators.insights?.length > 0 && (
                 <Badge variant="outline" className="gap-1">
                   <Lightbulb className="h-3 w-3" />
-                  {contextIndicators.insights.length} {contextIndicators.insights.length === 1 ? t.common.insight : t.common.insights}
+                  {contextIndicators.insights.length} {contextIndicators.insights.length === 1 ? t('common.insight') : t('common.insights')}
                 </Badge>
               )}
               {contextIndicators.notes?.length > 0 && (
                 <Badge variant="outline" className="gap-1">
                   <StickyNote className="h-3 w-3" />
-                  {contextIndicators.notes.length} {contextIndicators.notes.length === 1 ? t.common.note : t.common.notes}
+                  {contextIndicators.notes.length} {contextIndicators.notes.length === 1 ? t('common.note') : t('common.notes')}
                 </Badge>
               )}
             </div>
@@ -275,7 +275,7 @@ export function ChatPanel({
           {/* Model selector */}
           {onModelChange && (
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{t.chat.model}</span>
+              <span className="text-xs text-muted-foreground">{t('chat.model')}</span>
               <ModelSelector
                 currentModel={modelOverride}
                 onModelChange={onModelChange}
@@ -292,7 +292,7 @@ export function ChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`${t.chat.sendPlaceholder} (${t.chat.pressToSend.replace('{key}', keyHint)})`}
+              placeholder={`${t('chat.sendPlaceholder')} (${t('chat.pressToSend').replace('{key}', keyHint)})`}
               disabled={isStreaming}
               className="flex-1 min-h-[40px] max-h-[100px] resize-none py-2 px-3 min-w-0"
               rows={1}
@@ -328,7 +328,7 @@ function AIMessageContent({
 }) {
   const { t } = useTranslation()
   // Convert references to compact markdown with numbered citations
-  const markdownWithCompactRefs = convertReferencesToCompactMarkdown(content, t.common.references)
+  const markdownWithCompactRefs = convertReferencesToCompactMarkdown(content, t('common.references'))
 
   // Create custom link component for compact references
   const LinkComponent = createCompactReferenceLinkComponent(onReferenceClick)

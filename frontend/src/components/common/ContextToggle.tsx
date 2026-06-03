@@ -22,7 +22,33 @@ interface ContextToggleProps {
 export function ContextToggle({ mode, onChange, className }: ContextToggleProps) {
   const { t } = useTranslation()
 
-  const isOn = mode === 'on'
+  const MODE_CONFIG = {
+    off: {
+      icon: EyeOff,
+      label: t('common.contextModes.off'),
+      color: 'text-muted-foreground',
+      bgColor: 'hover:bg-muted'
+    },
+    insights: {
+      icon: Lightbulb,
+      label: t('common.contextModes.insights'),
+      color: 'text-amber-600',
+      bgColor: 'hover:bg-amber-50'
+    },
+    full: {
+      icon: FileText,
+      label: t('common.contextModes.full'),
+      color: 'text-primary',
+      bgColor: 'hover:bg-primary/10'
+    }
+  } as const
+  const config = MODE_CONFIG[mode]
+  const Icon = config.icon
+
+  // Determine available modes based on whether item has insights
+  const availableModes: ContextMode[] = hasInsights
+    ? ['off', 'insights', 'full']
+    : ['off', 'full']
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -55,7 +81,7 @@ export function ContextToggle({ mode, onChange, className }: ContextToggleProps)
             {isOn ? t.common.contextModes.on : t.common.contextModes.off}
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">
-            {t.common.contextModes.clickToToggle}
+            {t('common.contextModes.clickToCycle')}
           </p>
         </TooltipContent>
       </Tooltip>

@@ -72,7 +72,7 @@ export function useNotebookChat({ notebookId }: UseNotebookChatParams) {
         queryKey: QUERY_KEYS.notebookChatSessions(notebookId)
       })
       setCurrentSessionId(newSession.id)
-      toast.success(t.chat.sessionCreated)
+      toast.success(t('chat.sessionCreated'))
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { detail?: string } }, message?: string };
@@ -93,7 +93,7 @@ export function useNotebookChat({ notebookId }: UseNotebookChatParams) {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.notebookChatSession(currentSessionId!)
       })
-      toast.success(t.chat.sessionUpdated)
+      toast.success(t('chat.sessionUpdated'))
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { detail?: string } }, message?: string };
@@ -113,7 +113,7 @@ export function useNotebookChat({ notebookId }: UseNotebookChatParams) {
         setCurrentSessionId(null)
         setMessages([])
       }
-      toast.success(t.chat.sessionDeleted)
+      toast.success(t('chat.sessionDeleted'))
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { detail?: string } }, message?: string };
