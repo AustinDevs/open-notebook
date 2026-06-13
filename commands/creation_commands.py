@@ -3,9 +3,11 @@
 One command for all creators: it resolves the creator's declared model roles,
 assembles a CreationRequest, runs ``creator.generate``, validates + persists the
 result, and stores produced files under DATA_FOLDER. Dispatch is by ``creator_key``.
-"""
 
-from __future__ import annotations
+NOTE: do NOT add `from __future__ import annotations` here — it turns the
+CommandInput field annotations into strings, which breaks the model that
+surreal-commands generates for the command input ("... is not fully defined").
+"""
 
 import shutil
 import time
