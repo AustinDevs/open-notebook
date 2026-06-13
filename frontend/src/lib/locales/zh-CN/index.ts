@@ -1,4 +1,10 @@
 export const zhCN = {
+  creations: {
+    title: "创作",
+    podcast: "播客",
+    noCreationsYet: "暂无创作",
+    noCreationsDesc: "从该笔记本生成抽认卡、播客等内容。",
+  },
   common: {
     search: "搜索...",
     create: "新建",
@@ -245,7 +251,6 @@ export const zhCN = {
     updated: "已更新",
     namePlaceholder: "笔记本名称",
     addDescription: "添加描述...",
-    noNotesYet: "暂无笔记",
     deleteNote: "删除笔记",
     deleteNoteConfirm: "确定要删除此笔记吗？此操作无法撤销。",
     noteCreatedSuccess: "笔记创建成功",
@@ -350,7 +355,6 @@ export const zhCN = {
     writeNotePlaceholder: "在此处编写您的笔记内容...",
     saveNote: "保存笔记",
     createNoteBtn: "创建笔记",
-    createFirstNote: "创建您的第一条笔记，记录见解与观察。",
     urlLabel: "URL(s) *",
     fileLabel: "文件(s) *",
     textContentLabel: "文本内容 *",
@@ -532,11 +536,14 @@ export const zhCN = {
       easy: "简单",
       allDone: "全部完成 — 没有待复习的卡片。",
       downloadApkg: "下载 .apkg",
+      print: "打印",
+      exportCsv: "导出 CSV",
       cardCount: "{count} 张卡片",
       due: "待复习",
     },
     infographics: {
       exportPng: "导出 PNG",
+      exportSvg: "导出 SVG",
       renderError: "图表渲染失败",
     },
   },

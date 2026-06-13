@@ -1,4 +1,10 @@
 export const jaJP = {
+  creations: {
+    title: "作成物",
+    podcast: "ポッドキャスト",
+    noCreationsYet: "まだ作成物がありません",
+    noCreationsDesc: "このノートブックからフラッシュカードやポッドキャストなどを生成できます。",
+  },
   common: {
     search: "検索...",
     create: "新規",
@@ -245,7 +251,6 @@ export const jaJP = {
     updated: "更新日時",
     namePlaceholder: "ノートブック名",
     addDescription: "説明を追加...",
-    noNotesYet: "ノートがまだありません",
     deleteNote: "ノートを削除",
     deleteNoteConfirm: "このノートを削除しますか？この操作は元に戻せません。",
     noteCreatedSuccess: "ノートを作成しました",
@@ -350,7 +355,6 @@ export const jaJP = {
     writeNotePlaceholder: "ノートの内容をここに入力...",
     saveNote: "ノートを保存",
     createNoteBtn: "ノートを作成",
-    createFirstNote: "最初のノートを作成してインサイトや気づきを記録しましょう。",
     urlLabel: "URL *",
     fileLabel: "ファイル *",
     textContentLabel: "テキストコンテンツ *",
@@ -532,11 +536,14 @@ export const jaJP = {
       easy: "簡単",
       allDone: "すべて完了 — 復習するカードはありません。",
       downloadApkg: ".apkgをダウンロード",
+      print: "印刷",
+      exportCsv: "CSVをエクスポート",
       cardCount: "{count}枚のカード",
       due: "復習",
     },
     infographics: {
       exportPng: "PNGをエクスポート",
+      exportSvg: "SVGをエクスポート",
       renderError: "グラフの描画に失敗しました",
     },
   },

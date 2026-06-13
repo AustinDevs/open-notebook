@@ -1115,7 +1115,7 @@ wheels = [
 [[package]]
 name = "infographic-creator"
 version = "0.1.0"
-source = { git = "https://github.com/Notebooker-ai/infographic-creator.git?branch=main#971a80bf440c0f68d32b079dc99cff587eaeb3b3" }
+source = { git = "https://github.com/Notebooker-ai/infographic-creator.git?branch=main#8a454b064d5404fec14fcef9faf08f524f6bbb69" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },

@@ -225,6 +225,9 @@ class PodcastEpisode(ObjectModel):
     command: Optional[Union[str, RecordID]] = Field(
         default=None, description="Link to surreal-commands job"
     )
+    notebook_id: Optional[Union[str, RecordID]] = Field(
+        default=None, description="Notebook this episode was generated from"
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -259,7 +262,7 @@ class PodcastEpisode(ObjectModel):
         except Exception:
             return {"status": "unknown", "error_message": None}
 
-    @field_validator("command", mode="before")
+    @field_validator("command", "notebook_id", mode="before")
     @classmethod
     def parse_command(cls, value):
         if isinstance(value, str):
@@ -267,11 +270,15 @@ class PodcastEpisode(ObjectModel):
         return value
 
     def _prepare_save_data(self) -> dict:
-        """Override to ensure command field is always RecordID format for database"""
+        """Override to ensure record reference fields are RecordID format for database"""
         data = super()._prepare_save_data()
 
         # Ensure command field is RecordID format if not None
         if data.get("command") is not None:
             data["command"] = ensure_record_id(data["command"])
+
+        # Ensure notebook_id field is RecordID format if not None
+        if data.get("notebook_id") is not None:
+            data["notebook_id"] = ensure_record_id(data["notebook_id"])
 
         return data

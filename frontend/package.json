@@ -17,6 +17,7 @@
     "worker": "cd .. && uv run --no-sync --env-file .env surreal-commands-worker --import-modules commands"
   },
   "dependencies": {
+    "@antv/g-svg": "^2.1.1",
     "@antv/g2": "^5.4.8",
     "@hookform/resolvers": "^5.1.1",
     "@monaco-editor/react": "^4.7.0",

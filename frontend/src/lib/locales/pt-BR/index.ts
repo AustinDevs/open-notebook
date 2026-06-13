@@ -1,4 +1,10 @@
 export const ptBR = {
+  creations: {
+    title: "Criações",
+    podcast: "Podcast",
+    noCreationsYet: "Nenhuma criação ainda",
+    noCreationsDesc: "Gere flashcards, podcasts e muito mais a partir deste caderno.",
+  },
   common: {
     search: "Buscar...",
     create: "Novo",
@@ -245,7 +251,6 @@ export const ptBR = {
     updated: "Atualizado",
     namePlaceholder: "Nome do caderno",
     addDescription: "Adicionar descrição...",
-    noNotesYet: "Nenhuma nota ainda",
     deleteNote: "Excluir Nota",
     deleteNoteConfirm: "Tem certeza que deseja excluir esta nota? Esta ação não pode ser desfeita.",
     noteCreatedSuccess: "Nota criada com sucesso",
@@ -350,7 +355,6 @@ export const ptBR = {
     writeNotePlaceholder: "Escreva o conteúdo da sua nota aqui...",
     saveNote: "Salvar Nota",
     createNoteBtn: "Criar Nota",
-    createFirstNote: "Crie sua primeira nota para capturar insights e observações.",
     urlLabel: "URL(s) *",
     fileLabel: "Arquivo(s) *",
     textContentLabel: "Conteúdo de Texto *",
@@ -532,11 +536,14 @@ export const ptBR = {
       easy: "Fácil",
       allDone: "Tudo em dia — nenhum cartão pendente.",
       downloadApkg: "Baixar .apkg",
+      print: "Imprimir",
+      exportCsv: "Exportar CSV",
       cardCount: "{count} cartões",
       due: "pendentes",
     },
     infographics: {
       exportPng: "Exportar PNG",
+      exportSvg: "Exportar SVG",
       renderError: "Falha ao renderizar o gráfico",
     },
   },

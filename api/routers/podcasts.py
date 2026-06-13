@@ -84,10 +84,10 @@ async def get_podcast_job_status(job_id: str):
 
 
 @router.get("/podcasts/episodes", response_model=List[PodcastEpisodeResponse])
-async def list_podcast_episodes():
-    """List all podcast episodes"""
+async def list_podcast_episodes(notebook_id: Optional[str] = None):
+    """List podcast episodes, optionally scoped to a single notebook"""
     try:
-        episodes = await PodcastService.list_episodes()
+        episodes = await PodcastService.list_episodes(notebook_id=notebook_id)
 
         response_episodes = []
         for episode in episodes:
@@ -250,11 +250,12 @@ async def retry_podcast_episode(episode_id: str):
         # Delete the failed episode
         await episode.delete()
 
-        # Submit a new job
+        # Submit a new job, preserving the notebook association if any
         job_id = await PodcastService.submit_generation_job(
             episode_profile_name=ep_profile_name,
             speaker_profile_name=sp_profile_name,
             episode_name=episode_name,
+            notebook_id=str(episode.notebook_id) if episode.notebook_id else None,
             content=content,
         )
 

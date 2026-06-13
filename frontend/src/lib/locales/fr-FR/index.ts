@@ -1,4 +1,10 @@
 export const frFR = {
+  creations: {
+    title: "Créations",
+    podcast: "Podcast",
+    noCreationsYet: "Aucune création pour le moment",
+    noCreationsDesc: "Générez des cartes mémoire, des podcasts et plus encore à partir de ce carnet.",
+  },
   common: {
     search: "Recherche...",
     create: "Créer",
@@ -245,7 +251,6 @@ export const frFR = {
     updated: "Mis à jour",
     namePlaceholder: "Nom du carnet",
     addDescription: "Ajouter une description...",
-    noNotesYet: "Aucune note pour le moment",
     deleteNote: "Supprimer la note",
     deleteNoteConfirm: "Êtes-vous sûr de vouloir supprimer cette note ? Cette action est irréversible.",
     noteCreatedSuccess: "Note créée avec succès",
@@ -350,7 +355,6 @@ export const frFR = {
     writeNotePlaceholder: "Écrivez le contenu de votre note ici...",
     saveNote: "Enregistrer la note",
     createNoteBtn: "Créer la note",
-    createFirstNote: "Créez votre première note pour capturer des idées et des observations.",
     urlLabel: "URL(s) *",
     fileLabel: "Fichier(s) *",
     textContentLabel: "Contenu textuel *",
@@ -532,11 +536,14 @@ export const frFR = {
       easy: "Facile",
       allDone: "Tout est à jour — aucune carte à revoir.",
       downloadApkg: "Télécharger .apkg",
+      print: "Imprimer",
+      exportCsv: "Exporter en CSV",
       cardCount: "{count} cartes",
       due: "à revoir",
     },
     infographics: {
       exportPng: "Exporter en PNG",
+      exportSvg: "Exporter en SVG",
       renderError: "Échec du rendu du graphique",
     },
   },

@@ -41,12 +41,21 @@ interface SchemaProp {
   title?: string
   default?: unknown
   anyOf?: { type?: string }[]
+  enum?: (string | number)[]
 }
 
 function propType(p: SchemaProp): string {
   if (p.type) return p.type
   const t = p.anyOf?.find(v => v.type && v.type !== 'null')?.type
   return t || 'string'
+}
+
+// Turn an enum value into a human label, e.g. "classicDark" -> "Classic Dark".
+function prettyOption(value: string | number): string {
+  return String(value)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
 }
 
 export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChange }: Props) {
@@ -142,6 +151,29 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
           {Object.entries(properties).map(([key, prop]) => {
             const type = propType(prop)
             const labelText = prop.title || key
+            if (prop.enum && prop.enum.length > 0) {
+              const current = String(config[key] ?? prop.default ?? prop.enum[0])
+              return (
+                <div key={key} className="space-y-2">
+                  <Label>{labelText}</Label>
+                  <Select
+                    value={current}
+                    onValueChange={v => setConfig(c => ({ ...c, [key]: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {prop.enum.map(opt => (
+                        <SelectItem key={String(opt)} value={String(opt)}>
+                          {prettyOption(opt)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )
+            }
             if (type === 'boolean') {
               return (
                 <label key={key} className="flex items-center gap-2 text-sm">

@@ -1,4 +1,10 @@
 export const bnIN = {
+  creations: {
+    title: "সৃষ্টি",
+    podcast: "পডকাস্ট",
+    noCreationsYet: "এখনও কোনো সৃষ্টি নেই",
+    noCreationsDesc: "এই নোটবুক থেকে ফ্ল্যাশকার্ড, পডকাস্ট এবং আরও অনেক কিছু তৈরি করুন।",
+  },
   common: {
     search: "অনুসন্ধান...",
     create: "নতুন",
@@ -245,7 +251,6 @@ export const bnIN = {
     updated: "আপডেট করা",
     namePlaceholder: "নোটবুকের নাম",
     addDescription: "বিবরণ যোগ করুন...",
-    noNotesYet: "এখনও কোন নোট নেই",
     deleteNote: "নোট মুছে ফেলুন",
     deleteNoteConfirm: "আপনি কি নিশ্চিত এই নোটটি মুছে ফেলতে চান? এই কাজটি পুনরায় করা যাবে না।",
     noteCreatedSuccess: "নোট সফলভাবে তৈরি হয়েছে",
@@ -350,7 +355,6 @@ export const bnIN = {
     writeNotePlaceholder: "এখানে আপনার নোটের কন্টেন্ট লিখুন...",
     saveNote: "নোট সংরক্ষণ",
     createNoteBtn: "নোট তৈরি করুন",
-    createFirstNote: "অন্তর্দৃষ্টি ও পর্যবেক্ষণ ক্যাপচার করতে আপনার প্রথম নোট তৈরি করুন।",
     urlLabel: "URL(গুলি) *",
     fileLabel: "ফাইল(গুলি) *",
     textContentLabel: "টেক্সট কন্টেন্ট *",
@@ -532,11 +536,14 @@ export const bnIN = {
       easy: "সহজ",
       allDone: "সব হালনাগাদ — কোনো কার্ড বাকি নেই।",
       downloadApkg: ".apkg ডাউনলোড করুন",
+      print: "প্রিন্ট",
+      exportCsv: "CSV এক্সপোর্ট করুন",
       cardCount: "{count}টি কার্ড",
       due: "বাকি",
     },
     infographics: {
       exportPng: "PNG এক্সপোর্ট করুন",
+      exportSvg: "SVG এক্সপোর্ট করুন",
       renderError: "চার্ট রেন্ডার করা যায়নি",
     },
   },

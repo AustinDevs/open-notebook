@@ -1,0 +1,6 @@
+-- Migration 1781390133: episode_notebook_id
+-- Associate podcast episodes with a notebook so they can be scoped/filtered
+-- per notebook in the Creations column.
+
+DEFINE FIELD IF NOT EXISTS notebook_id ON TABLE episode TYPE option<record<notebook>>;
+DEFINE INDEX IF NOT EXISTS episode_notebook ON TABLE episode FIELDS notebook_id;

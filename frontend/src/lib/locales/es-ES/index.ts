@@ -1,4 +1,10 @@
 export const esES = {
+  creations: {
+    title: "Creaciones",
+    podcast: "Pódcast",
+    noCreationsYet: "Aún no hay creaciones",
+    noCreationsDesc: "Genera tarjetas, pódcasts y más a partir de este cuaderno.",
+  },
   common: {
     search: "Buscar...",
     create: "Nuevo",
@@ -245,7 +251,6 @@ export const esES = {
     updated: "Actualizado",
     namePlaceholder: "Nombre del cuaderno",
     addDescription: "Agregar descripción...",
-    noNotesYet: "Aún no hay notas",
     deleteNote: "Eliminar nota",
     deleteNoteConfirm: "¿Estás seguro de que quieres eliminar esta nota? Esta acción no se puede deshacer.",
     noteCreatedSuccess: "Nota creada exitosamente",
@@ -350,7 +355,6 @@ export const esES = {
     writeNotePlaceholder: "Escribe el contenido de tu nota aquí...",
     saveNote: "Guardar nota",
     createNoteBtn: "Crear nota",
-    createFirstNote: "Crea tu primera nota para capturar ideas y observaciones.",
     urlLabel: "URL(s) *",
     fileLabel: "Archivo(s) *",
     textContentLabel: "Contenido de texto *",
@@ -532,11 +536,14 @@ export const esES = {
       easy: "Fácil",
       allDone: "Todo al día: no hay tarjetas pendientes.",
       downloadApkg: "Descargar .apkg",
+      print: "Imprimir",
+      exportCsv: "Exportar CSV",
       cardCount: "{count} tarjetas",
       due: "pendientes",
     },
     infographics: {
       exportPng: "Exportar PNG",
+      exportSvg: "Exportar SVG",
       renderError: "Error al renderizar el gráfico",
     },
   },

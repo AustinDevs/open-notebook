@@ -1,4 +1,10 @@
 export const caES = {
+  creations: {
+    title: "Creacions",
+    podcast: "Podcast",
+    noCreationsYet: "Encara no hi ha creacions",
+    noCreationsDesc: "Genera targetes, podcasts i més a partir d'aquest quadern.",
+  },
   common: {
     search: "Cerca...",
     create: "Nou",
@@ -245,7 +251,6 @@ export const caES = {
     updated: "Actualitzat",
     namePlaceholder: "Nom del quadern",
     addDescription: "Afegeix una descripció...",
-    noNotesYet: "Encara no hi ha notes",
     deleteNote: "Suprimeix la nota",
     deleteNoteConfirm: "Segur que vols suprimir aquesta nota? Aquesta acció no es pot desfer.",
     noteCreatedSuccess: "S'ha creat la nota correctament",
@@ -350,7 +355,6 @@ export const caES = {
     writeNotePlaceholder: "Escriu el contingut de la nota aquí...",
     saveNote: "Desa la nota",
     createNoteBtn: "Crea la nota",
-    createFirstNote: "Crea la primera nota per capturar anàlisis i observacions.",
     urlLabel: "URL(s) *",
     fileLabel: "Fitxer(s) *",
     textContentLabel: "Contingut de text *",
@@ -532,11 +536,14 @@ export const caES = {
       easy: "Fàcil",
       allDone: "Tot al dia — cap targeta pendent.",
       downloadApkg: "Baixa .apkg",
+      print: "Imprimeix",
+      exportCsv: "Exporta CSV",
       cardCount: "{count} targetes",
       due: "pendents",
     },
     infographics: {
       exportPng: "Exporta PNG",
+      exportSvg: "Exporta SVG",
       renderError: "No s’ha pogut renderitzar el gràfic",
     },
   },

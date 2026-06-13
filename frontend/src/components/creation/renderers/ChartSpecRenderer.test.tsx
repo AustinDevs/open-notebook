@@ -7,7 +7,7 @@ import type { CreationArtifact } from '@/lib/types/creation'
 // --- mocks ------------------------------------------------------------------
 // Use a real class so `new Chart()` and its methods behave normally; each method
 // delegates to a spy. (A vi.fn() with `new` doesn't reliably adopt a returned object.)
-const { ChartCtor, chartOptions, chartRender, chartDestroy, triggerBrowserDownload, FakeChart } =
+const { ChartCtor, chartOptions, chartRender, triggerBrowserDownload, FakeChart } =
   vi.hoisted(() => {
     const ChartCtor = vi.fn()
     const chartOptions = vi.fn()
@@ -29,7 +29,7 @@ const { ChartCtor, chartOptions, chartRender, chartDestroy, triggerBrowserDownlo
         chartDestroy()
       }
     }
-    return { ChartCtor, chartOptions, chartRender, chartDestroy, triggerBrowserDownload: vi.fn(), FakeChart }
+    return { ChartCtor, chartOptions, chartRender, triggerBrowserDownload: vi.fn(), FakeChart }
   })
 vi.mock('@antv/g2', () => ({ Chart: FakeChart }))
 vi.mock('@/lib/api/creation', () => ({ triggerBrowserDownload }))
@@ -64,11 +64,12 @@ describe('ChartSpecRenderer', () => {
     triggerBrowserDownload.mockClear()
   })
 
-  it('renders the title and an export button per spec', () => {
+  it('renders the title and PNG + SVG export buttons per spec', () => {
     render(<ChartSpecRenderer artifact={makeArtifact()} />)
     expect(screen.getByText('Quarterly Sales')).toBeDefined()
-    // one export-PNG button per chart spec (2)
+    // one PNG + one SVG export button per chart spec (2 specs)
     expect(screen.getAllByText('creation.infographics.exportPng')).toHaveLength(2)
+    expect(screen.getAllByText('creation.infographics.exportSvg')).toHaveLength(2)
   })
 
   it('renders one chart container per spec', () => {

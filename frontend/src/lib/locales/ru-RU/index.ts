@@ -1,4 +1,10 @@
 export const ruRU = {
+  creations: {
+    title: "Материалы",
+    podcast: "Подкаст",
+    noCreationsYet: "Пока нет материалов",
+    noCreationsDesc: "Создавайте карточки, подкасты и многое другое из этого блокнота.",
+  },
   common: {
     search: "Поиск...",
     create: "Создать",
@@ -245,7 +251,6 @@ export const ruRU = {
     updated: "Обновлено",
     namePlaceholder: "Название блокнота",
     addDescription: "Добавить описание...",
-    noNotesYet: "Пока нет заметок",
     deleteNote: "Удалить заметку",
     deleteNoteConfirm: "Вы уверены, что хотите удалить эту заметку? Это действие нельзя отменить.",
     noteCreatedSuccess: "Заметка успешно создана",
@@ -350,7 +355,6 @@ export const ruRU = {
     writeNotePlaceholder: "Напишите содержимое заметки здесь...",
     saveNote: "Сохранить заметку",
     createNoteBtn: "Создать заметку",
-    createFirstNote: "Создайте первую заметку для записи идей и наблюдений.",
     urlLabel: "URL(ы) *",
     fileLabel: "Файл(ы) *",
     textContentLabel: "Текстовое содержимое *",
@@ -532,11 +536,14 @@ export const ruRU = {
       easy: "Легко",
       allDone: "Всё готово — нет карточек к повторению.",
       downloadApkg: "Скачать .apkg",
+      print: "Печать",
+      exportCsv: "Экспорт CSV",
       cardCount: "{count} карточек",
       due: "к повторению",
     },
     infographics: {
       exportPng: "Экспорт PNG",
+      exportSvg: "Экспорт SVG",
       renderError: "Не удалось отобразить диаграмму",
     },
   },

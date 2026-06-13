@@ -1,0 +1,4 @@
+-- Rollback for migration 1781390133: episode_notebook_id
+
+REMOVE INDEX IF EXISTS episode_notebook ON TABLE episode;
+REMOVE FIELD IF EXISTS notebook_id ON TABLE episode;

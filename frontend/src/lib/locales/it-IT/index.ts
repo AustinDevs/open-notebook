@@ -1,4 +1,10 @@
 export const itIT = {
+  creations: {
+    title: "Creazioni",
+    podcast: "Podcast",
+    noCreationsYet: "Ancora nessuna creazione",
+    noCreationsDesc: "Genera flashcard, podcast e altro da questo taccuino.",
+  },
   common: {
     search: "Cerca...",
     create: "Nuovo",
@@ -245,7 +251,6 @@ export const itIT = {
     updated: "Aggiornato",
     namePlaceholder: "Nome quaderno",
     addDescription: "Aggiungi descrizione...",
-    noNotesYet: "Ancora nessuna nota",
     deleteNote: "Elimina Nota",
     deleteNoteConfirm: "Sei sicuro di voler eliminare questa nota? Questa azione non può essere annullata.",
     noteCreatedSuccess: "Nota creata con successo",
@@ -350,7 +355,6 @@ export const itIT = {
     writeNotePlaceholder: "Scrivi il contenuto della tua nota qui...",
     saveNote: "Salva nota",
     createNoteBtn: "Crea nota",
-    createFirstNote: "Crea la tua prima nota per catturare intuizioni e osservazioni.",
     urlLabel: "URL *",
     fileLabel: "File *",
     textContentLabel: "Contenuto testo *",
@@ -532,11 +536,14 @@ export const itIT = {
       easy: "Facile",
       allDone: "Tutto in pari — nessuna scheda da ripassare.",
       downloadApkg: "Scarica .apkg",
+      print: "Stampa",
+      exportCsv: "Esporta CSV",
       cardCount: "{count} schede",
       due: "da ripassare",
     },
     infographics: {
       exportPng: "Esporta PNG",
+      exportSvg: "Esporta SVG",
       renderError: "Impossibile renderizzare il grafico",
     },
   },

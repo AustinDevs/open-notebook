@@ -1,4 +1,10 @@
 export const trTR = {
+  creations: {
+    title: "Üretimler",
+    podcast: "Podcast",
+    noCreationsYet: "Henüz üretim yok",
+    noCreationsDesc: "Bu not defterinden bilgi kartları, podcast'ler ve daha fazlasını oluşturun.",
+  },
   common: {
     search: "Ara...",
     create: "Yeni",
@@ -245,7 +251,6 @@ export const trTR = {
     updated: "Güncellendi",
     namePlaceholder: "Defter adı",
     addDescription: "Açıklama ekle...",
-    noNotesYet: "Henüz not yok",
     deleteNote: "Notu Sil",
     deleteNoteConfirm: "Bu notu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     noteCreatedSuccess: "Not başarıyla oluşturuldu",
@@ -350,7 +355,6 @@ export const trTR = {
     writeNotePlaceholder: "Not içeriğinizi buraya yazın...",
     saveNote: "Notu Kaydet",
     createNoteBtn: "Not Oluştur",
-    createFirstNote: "İçgörüleri ve gözlemleri kaydetmek için ilk notunuzu oluşturun.",
     urlLabel: "URL(ler) *",
     fileLabel: "Dosya(lar) *",
     textContentLabel: "Metin İçeriği *",
@@ -532,11 +536,14 @@ export const trTR = {
       easy: "Kolay",
       allDone: "Her şey güncel — bekleyen kart yok.",
       downloadApkg: ".apkg indir",
+      print: "Yazdır",
+      exportCsv: "CSV dışa aktar",
       cardCount: "{count} kart",
       due: "bekliyor",
     },
     infographics: {
       exportPng: "PNG dışa aktar",
+      exportSvg: "SVG dışa aktar",
       renderError: "Grafik oluşturulamadı",
     },
   },

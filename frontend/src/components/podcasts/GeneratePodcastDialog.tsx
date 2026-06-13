@@ -68,6 +68,8 @@ function getSourceDefaultMode(source: SourceListResponse): SourceMode {
 interface GeneratePodcastDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** When set, this notebook is pre-expanded and the resulting episode is filed under it. */
+  defaultNotebookId?: string
 }
 
 interface NotebookSummary {
@@ -394,7 +396,7 @@ function ContentSelectionPanel({
   )
 }
 
-export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDialogProps) {
+export function GeneratePodcastDialog({ open, onOpenChange, defaultNotebookId }: GeneratePodcastDialogProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -552,6 +554,15 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
       resetState()
     }
   }, [open, resetState])
+
+  // Pre-expand the originating notebook when launched from a notebook view
+  useEffect(() => {
+    if (open && defaultNotebookId) {
+      setExpandedNotebooks((prev) =>
+        prev.includes(defaultNotebookId) ? prev : [...prev, defaultNotebookId]
+      )
+    }
+  }, [open, defaultNotebookId])
 
   // Update token/char counts when selections change
   useEffect(() => {
@@ -816,6 +827,7 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
         episode_name: episodeName.trim(),
         content,
         briefing_suffix: instructions.trim() ? instructions.trim() : undefined,
+        notebook_id: defaultNotebookId,
       }
 
       await generatePodcast.mutateAsync(payload)
@@ -850,6 +862,7 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
     selectedEpisodeProfile,
     toast,
     t,
+    defaultNotebookId,
   ])
 
   const isSubmitting = generatePodcast.isPending || isBuildingContext

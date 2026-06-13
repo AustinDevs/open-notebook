@@ -30,10 +30,62 @@ function reviveCard(state: Record<string, unknown> | undefined): FsrsCard {
   return c
 }
 
+type Card = { id: string; front: string; back: string; tags?: string[] }
+
+function htmlEscape(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+// Open a print-friendly window (front/back per card) and trigger the browser's
+// print dialog — users can print on paper or "Save as PDF".
+function printFlashcards(deckName: string, cards: Card[]) {
+  const w = window.open('', '_blank')
+  if (!w) return
+  const rows = cards
+    .map(
+      (c, i) =>
+        `<div class="card"><div class="q">${i + 1}. ${htmlEscape(c.front)}</div>` +
+        `<div class="a">${htmlEscape(c.back)}</div></div>`
+    )
+    .join('')
+  w.document.write(
+    `<!doctype html><html><head><meta charset="utf-8"><title>${htmlEscape(deckName)}</title>` +
+      `<style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111}` +
+      `h1{font-size:1.4rem}.card{border:1px solid #ddd;border-radius:8px;padding:12px 16px;` +
+      `margin:10px 0;page-break-inside:avoid}.q{font-weight:600;margin-bottom:6px}` +
+      `.a{color:#444}@media print{.card{break-inside:avoid}}</style></head><body>` +
+      `<h1>${htmlEscape(deckName)}</h1>${rows}` +
+      `<script>window.onload=function(){window.print()}</script></body></html>`
+  )
+  w.document.close()
+}
+
+function csvCell(s: string): string {
+  return `"${s.replace(/"/g, '""')}"`
+}
+
+function exportCsv(deckName: string, cards: Card[]) {
+  const lines = [['front', 'back', 'tags'].join(',')]
+  for (const c of cards) {
+    lines.push(
+      [csvCell(c.front), csvCell(c.back), csvCell((c.tags ?? []).join('|'))].join(',')
+    )
+  }
+  const safe = deckName.replace(/[^A-Za-z0-9._-]+/g, '_') || 'flashcards'
+  triggerBrowserDownload(
+    new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }),
+    `${safe}.csv`
+  )
+}
+
 export function FlashcardsRenderer({ artifact }: { artifact: CreationArtifact }) {
   const { t } = useTranslation()
   const parsed = useMemo(() => FlashcardsV1Schema.safeParse(artifact.data), [artifact.data])
   const cards = useMemo(() => (parsed.success ? parsed.data.cards : []), [parsed])
+  const deckName = (parsed.success ? parsed.data.deck_name : artifact.name) || artifact.name
 
   const { data: storedReview } = useFlashcardReview(artifact.id)
   const saveReview = useSaveFlashcardReview(artifact.id)
@@ -108,6 +160,20 @@ export function FlashcardsRenderer({ artifact }: { artifact: CreationArtifact })
               {t('creation.flashcards.downloadApkg')}
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => printFlashcards(deckName, cards)}
+          >
+            {t('creation.flashcards.print')}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => exportCsv(deckName, cards)}
+          >
+            {t('creation.flashcards.exportCsv')}
+          </Button>
         </div>
       </div>
 

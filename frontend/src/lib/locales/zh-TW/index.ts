@@ -1,4 +1,10 @@
 export const zhTW = {
+  creations: {
+    title: "創作",
+    podcast: "Podcast",
+    noCreationsYet: "尚無創作",
+    noCreationsDesc: "從此筆記本產生字卡、Podcast 等內容。",
+  },
   common: {
     search: "搜尋...",
     create: "新增",
@@ -245,7 +251,6 @@ export const zhTW = {
     updated: "已更新",
     namePlaceholder: "筆記本名稱",
     addDescription: "新增描述...",
-    noNotesYet: "暫無筆記",
     deleteNote: "刪除筆記",
     deleteNoteConfirm: "確定要刪除此筆記嗎？此操作無法撤銷。",
     noteCreatedSuccess: "筆記創建成功",
@@ -350,7 +355,6 @@ export const zhTW = {
     writeNotePlaceholder: "在此處編寫您的筆記內容...",
     saveNote: "儲存筆記",
     createNoteBtn: "新增筆記",
-    createFirstNote: "新增您的第一條筆記，記錄見解與觀察。",
     urlLabel: "URL(s) *",
     fileLabel: "檔案(s) *",
     textContentLabel: "文字內容 *",
@@ -532,11 +536,14 @@ export const zhTW = {
       easy: "簡單",
       allDone: "全部完成 — 沒有待複習的卡片。",
       downloadApkg: "下載 .apkg",
+      print: "列印",
+      exportCsv: "匯出 CSV",
       cardCount: "{count} 張卡片",
       due: "待複習",
     },
     infographics: {
       exportPng: "匯出 PNG",
+      exportSvg: "匯出 SVG",
       renderError: "圖表轉譯失敗",
     },
   },

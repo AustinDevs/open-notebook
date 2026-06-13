@@ -82,6 +82,7 @@ class PodcastService:
                 "episode_name": episode_name,
                 "content": str(content),
                 "briefing_suffix": briefing_suffix,
+                "notebook_id": notebook_id,
             }
 
             # Ensure command modules are imported before submitting
@@ -138,9 +139,27 @@ class PodcastService:
             )
 
     @staticmethod
-    async def list_episodes() -> list:
-        """List all podcast episodes"""
+    async def list_episodes(notebook_id: Optional[str] = None) -> list:
+        """List podcast episodes, optionally scoped to a single notebook"""
         try:
+            if notebook_id:
+                from open_notebook.database.repository import (
+                    ensure_record_id,
+                    repo_query,
+                )
+
+                result = await repo_query(
+                    "SELECT * FROM episode WHERE notebook_id = $notebook_id ORDER BY created DESC",
+                    {"notebook_id": ensure_record_id(notebook_id)},
+                )
+                episodes = []
+                for obj in result:
+                    try:
+                        episodes.append(PodcastEpisode(**obj))
+                    except Exception as e:
+                        logger.critical(f"Error creating episode object: {str(e)}")
+                return episodes
+
             episodes = await PodcastEpisode.get_all(order_by="created desc")
             return episodes
         except Exception as e:

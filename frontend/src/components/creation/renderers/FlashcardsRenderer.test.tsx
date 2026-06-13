@@ -79,6 +79,21 @@ describe('FlashcardsRenderer', () => {
     expect(downloadFile).toHaveBeenCalledWith('creation_artifact:1', 0)
   })
 
+  it('always offers Print and CSV export, even without an .apkg', () => {
+    render(<FlashcardsRenderer artifact={makeArtifact({ files: [] })} />)
+    expect(screen.getByText('creation.flashcards.print')).toBeDefined()
+    expect(screen.getByText('creation.flashcards.exportCsv')).toBeDefined()
+  })
+
+  it('exports cards as CSV when the CSV button is clicked', () => {
+    render(<FlashcardsRenderer artifact={makeArtifact()} />)
+    fireEvent.click(screen.getByText('creation.flashcards.exportCsv'))
+    expect(triggerBrowserDownload).toHaveBeenCalledTimes(1)
+    const [blob, filename] = triggerBrowserDownload.mock.calls[0]
+    expect(filename.endsWith('.csv')).toBe(true)
+    expect(blob).toBeInstanceOf(Blob)
+  })
+
   it('runs the study flow: reveal then rate, persisting review state', () => {
     render(<FlashcardsRenderer artifact={makeArtifact()} />)
 

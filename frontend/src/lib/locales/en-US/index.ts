@@ -1,4 +1,10 @@
 export const enUS = {
+  creations: {
+    title: "Creations",
+    podcast: "Podcast",
+    noCreationsYet: "No creations yet",
+    noCreationsDesc: "Generate flashcards, podcasts and more from this notebook.",
+  },
   common: {
     search: "Search...",
     create: "New",
@@ -245,7 +251,6 @@ export const enUS = {
     updated: "Updated",
     namePlaceholder: "Notebook name",
     addDescription: "Add description...",
-    noNotesYet: "No notes yet",
     deleteNote: "Delete Note",
     deleteNoteConfirm: "Are you sure you want to delete this note? This action cannot be undone.",
     noteCreatedSuccess: "Note created successfully",
@@ -350,7 +355,6 @@ export const enUS = {
     writeNotePlaceholder: "Write your note content here...",
     saveNote: "Save Note",
     createNoteBtn: "Create Note",
-    createFirstNote: "Create your first note to capture insights and observations.",
     urlLabel: "URL(s) *",
     fileLabel: "File(s) *",
     textContentLabel: "Text Content *",
@@ -532,11 +536,14 @@ export const enUS = {
       easy: "Easy",
       allDone: "All caught up — no cards due.",
       downloadApkg: "Download .apkg",
+      print: "Print",
+      exportCsv: "Export CSV",
       cardCount: "{count} cards",
       due: "due",
     },
     infographics: {
       exportPng: "Export PNG",
+      exportSvg: "Export SVG",
       renderError: "Failed to render chart",
     },
   },

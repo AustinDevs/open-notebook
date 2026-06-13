@@ -1,4 +1,10 @@
 export const plPL = {
+  creations: {
+    title: "Materiały",
+    podcast: "Podcast",
+    noCreationsYet: "Brak materiałów",
+    noCreationsDesc: "Generuj fiszki, podcasty i więcej z tego notatnika.",
+  },
   common: {
     search: "Szukaj...",
     create: "Nowy",
@@ -245,7 +251,6 @@ export const plPL = {
     updated: "Zaktualizowano",
     namePlaceholder: "Nazwa notatnika",
     addDescription: "Dodaj opis...",
-    noNotesYet: "Brak notatek",
     deleteNote: "Usuń notatkę",
     deleteNoteConfirm: "Czy na pewno chcesz usunąć tę notatkę? Tej operacji nie można cofnąć.",
     noteCreatedSuccess: "Notatka utworzona pomyślnie",
@@ -350,7 +355,6 @@ export const plPL = {
     writeNotePlaceholder: "Napisz tutaj treść notatki...",
     saveNote: "Zapisz notatkę",
     createNoteBtn: "Utwórz notatkę",
-    createFirstNote: "Utwórz pierwszą notatkę, aby zapisać wglądy i obserwacje.",
     urlLabel: "Adres(y) URL *",
     fileLabel: "Plik(i) *",
     textContentLabel: "Treść tekstowa *",
@@ -532,11 +536,14 @@ export const plPL = {
       easy: "Łatwe",
       allDone: "Wszystko na bieżąco — brak kart do powtórki.",
       downloadApkg: "Pobierz .apkg",
+      print: "Drukuj",
+      exportCsv: "Eksportuj CSV",
       cardCount: "{count} kart",
       due: "do powtórki",
     },
     infographics: {
       exportPng: "Eksportuj PNG",
+      exportSvg: "Eksportuj SVG",
       renderError: "Nie udało się wyrenderować wykresu",
     },
   },

@@ -2,6 +2,12 @@
 // Translate values only; do not change keys, placeholders or structure.
 
 export const deDE = {
+  creations: {
+    title: "Kreationen",
+    podcast: "Podcast",
+    noCreationsYet: "Noch keine Kreationen",
+    noCreationsDesc: "Erstelle Lernkarten, Podcasts und mehr aus diesem Notizbuch.",
+  },
   common: {
     search: "Suchen...",
     create: "Neu",
@@ -248,7 +254,6 @@ export const deDE = {
     updated: "Aktualisiert",
     namePlaceholder: "Notebook-Name",
     addDescription: "Beschreibung hinzufügen...",
-    noNotesYet: "Noch keine Notizen",
     deleteNote: "Notiz löschen",
     deleteNoteConfirm: "Möchtest du diese Notiz wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     noteCreatedSuccess: "Notiz erfolgreich erstellt",
@@ -353,7 +358,6 @@ export const deDE = {
     writeNotePlaceholder: "Schreibe den Inhalt deiner Notiz hier hinein...",
     saveNote: "Notiz speichern",
     createNoteBtn: "Notiz erstellen",
-    createFirstNote: "Erstelle deine erste Notiz, um Erkenntnisse und Beobachtungen festzuhalten.",
     urlLabel: "URL(s) *",
     fileLabel: "Datei(en) *",
     textContentLabel: "Textinhalt *",
@@ -535,11 +539,14 @@ export const deDE = {
       easy: "Einfach",
       allDone: "Alles erledigt — keine Karten fällig.",
       downloadApkg: ".apkg herunterladen",
+      print: "Drucken",
+      exportCsv: "CSV exportieren",
       cardCount: "{count} Karten",
       due: "fällig",
     },
     infographics: {
       exportPng: "PNG exportieren",
+      exportSvg: "SVG exportieren",
       renderError: "Diagramm konnte nicht gerendert werden",
     },
   },
