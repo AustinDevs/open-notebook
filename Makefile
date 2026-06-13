@@ -1,4 +1,4 @@
-.PHONY: run frontend check ruff database lint api start-all stop-all status clean-cache worker worker-start worker-stop worker-restart
+.PHONY: run frontend check ruff database migration lint api start-all stop-all status clean-cache worker worker-start worker-stop worker-restart
 .PHONY: docker-buildx-prepare docker-buildx-clean docker-buildx-reset
 .PHONY: docker-push docker-push-latest docker-release docker-build-local tag export-docs
 
@@ -14,6 +14,19 @@ PLATFORMS := linux/amd64,linux/arm64
 
 database:
 	docker compose up -d surrealdb
+
+# Create a new timestamp-named migration (+ rollback) file.
+# Usage: make migration name=add_widget_table
+migration:
+	@if [ -z "$(name)" ]; then echo "Usage: make migration name=<short_description>"; exit 1; fi
+	@ts=$$(date +%s); \
+	dir=open_notebook/database/migrations; \
+	up=$$dir/$${ts}_$(name).surrealql; \
+	down=$$dir/$${ts}_$(name)_down.surrealql; \
+	printf -- "-- Migration %s: %s\n\n" "$$ts" "$(name)" > $$up; \
+	printf -- "-- Rollback for migration %s: %s\n\n" "$$ts" "$(name)" > $$down; \
+	echo "Created $$up"; \
+	echo "Created $$down"
 
 run:
 	@echo "⚠️  Warning: Starting frontend only. For full functionality, use 'make start-all'"

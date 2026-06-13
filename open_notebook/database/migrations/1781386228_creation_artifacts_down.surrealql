@@ -1,0 +1,3 @@
+-- Rollback for Creation plugin system migration
+REMOVE TABLE IF EXISTS flashcard_review;
+REMOVE TABLE IF EXISTS creation_artifact;

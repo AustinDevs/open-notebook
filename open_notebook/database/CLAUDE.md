@@ -50,10 +50,12 @@ Both leverage connection context manager for lifecycle management and automatic 
   - `run_one_down()`: Rollback latest migration
 
 - `AsyncMigrationManager`: Main orchestrator
-  - Loads 14 up migrations + 14 down migrations (hard-coded in __init__; migrations 11-12 add credential system, 13 adds model-credential link, 14 adds podcast model registry fields)
-  - `get_current_version()`: Query max version from _sbl_migrations table
-  - `needs_migration()`: Boolean check (current < total migrations available)
-  - `run_migration_up()`: Run all pending migrations with logging
+  - **Auto-discovers** all `migrations/*.surrealql` via `discover_migrations()` (no hard-coded list), ordering by integer id. Files are `<id>[_<description>].surrealql`; ids are either legacy sequential (`1`..`15`) or unix timestamps for new migrations (`1718305200_add_x.surrealql`, created via `make migration name=add_x`).
+  - Tracks an **applied set**: each applied migration's id is recorded in `_sbl_migrations` (id stored in the `version` field). Pending = discovered ids not in the applied set. Backward compatible — existing rows 1..N are treated as the applied ids.
+  - `get_current_version()`: Highest applied id (display/logging only)
+  - `needs_migration()`: True if any discovered id is unapplied
+  - `run_migration_up()`: Apply each pending migration (ascending id), recording its id
+  - `run_migration_down()`: Roll back the highest applied migration that has a `_down` file
 
 **Version Tracking**
 - `get_latest_version()`: Query max version; returns 0 if _sbl_migrations table missing
@@ -87,7 +89,7 @@ Both leverage connection context manager for lifecycle management and automatic 
 ## Important Quirks & Gotchas
 
 - **No connection pooling**: Each repo_* operation creates new connection; adequate for HTTP request-scoped operations but inefficient for bulk workloads
-- **Hard-coded migration files**: AsyncMigrationManager lists migrations 1-14 explicitly; adding new migration requires code change (not auto-discovery)
+- **Auto-discovered migrations**: AsyncMigrationManager scans the `migrations/` dir; dropping in a `<id>[_desc].surrealql` file is enough (no code change). Prefer unix-timestamp ids for new migrations (`make migration name=...`) to avoid sequential-number collisions between branches.
 - **Record ID format inconsistency**: repo_update() accepts both `table:id` format and full RecordID; path handling can be subtle
 - **ISO date parsing**: repo_update() parses `created` field from string to datetime if present; assumes ISO format
 - **Timestamp overwrite risk**: repo_create() always sets new timestamps; can't preserve original created time on reimport
@@ -97,7 +99,7 @@ Both leverage connection context manager for lifecycle management and automatic 
 ## How to Extend
 
 1. **Add new CRUD operation**: Follow repo_* pattern (open connection, execute query, handle errors, close)
-2. **Add migration**: Create migration file in `/migrations/N.surrealql` and `/migrations/N_down.surrealql`; update AsyncMigrationManager to load new files
+2. **Add migration**: Run `make migration name=<desc>` (creates `migrations/<unix_ts>_<desc>.surrealql` + `_down`), fill in the SurrealQL. Auto-discovered on next startup — no code change. (Legacy sequential `N.surrealql` files still work.)
 3. **Change timestamp behavior**: Modify repo_create()/repo_update() to not auto-set `updated` field if caller-provided
 4. **Implement connection pooling**: Replace db_connection context manager with pool.acquire() pattern (for high-throughput scenarios)
 

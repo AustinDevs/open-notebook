@@ -43,6 +43,10 @@ describe('Unused Key Detection', () => {
       const files = fs.readdirSync(srcDir, { recursive: true }) as string[]
       const sourceFiles = files.filter(f => {
         const full = path.join(srcDir, f)
+        // Only scan first-party app source — never dependencies or build output.
+        // (Some packages contain directories named like "types.d.ts" which would
+        // otherwise crash the walker with EISDIR.)
+        if (f.includes('node_modules') || f.includes('.next')) return false
         if (full.startsWith(localesDir)) return false
         if (f.endsWith('.test.ts') || f.endsWith('.test.tsx')) return false
         return f.endsWith('.ts') || f.endsWith('.tsx')

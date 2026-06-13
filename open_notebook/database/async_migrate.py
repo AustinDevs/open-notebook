@@ -1,238 +1,196 @@
 """
 Async migration system for SurrealDB using the official Python client.
-Based on patterns from sblpy migration system.
+
+Migrations are auto-discovered from the ``migrations/`` directory and tracked
+individually by id in the ``_sbl_migrations`` table (an "applied set" model).
+
+A migration file is named ``<id>[_<description>].surrealql`` where ``<id>`` is an
+integer. Two id styles are supported and interleave correctly because they sort
+numerically:
+
+* **Legacy sequential**: ``1.surrealql`` … ``15.surrealql`` (the original core
+  migrations; already applied on existing databases).
+* **Unix timestamp** (preferred for new migrations): ``1718305200_add_x.surrealql``
+  — created with ``date +%s`` (or ``make migration name=add_x``). Timestamps are
+  far larger than the legacy ids, so they always run after them, and two authors
+  never collide on "the next number".
+
+Each migration may have an optional rollback file with the same stem plus
+``_down`` (e.g. ``1718305200_add_x_down.surrealql``).
 """
 
-from typing import List
+from pathlib import Path
+from typing import List, Optional, Set
 
 from loguru import logger
 
 from .repository import db_connection, repo_query
 
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+
+
+def _clean_sql(raw_content: str) -> str:
+    """Strip comments/blank lines and collapse to a single executable string."""
+    lines = []
+    for line in raw_content.split("\n"):
+        line = line.strip()
+        if line and not line.startswith("--"):
+            lines.append(line)
+    return " ".join(lines)
+
 
 class AsyncMigration:
-    """
-    Handles individual migration operations with async support.
-    """
+    """A single migration: an integer id, its up SQL, and optional down SQL."""
 
-    def __init__(self, sql: str) -> None:
-        """Initialize migration with SQL content."""
+    def __init__(self, migration_id: int, sql: str, down_sql: Optional[str] = None):
+        self.id = migration_id
         self.sql = sql
+        self.down_sql = down_sql
 
     @classmethod
-    def from_file(cls, file_path: str) -> "AsyncMigration":
-        """Create migration from SQL file."""
-        with open(file_path, "r", encoding="utf-8") as file:
-            raw_content = file.read()
-            # Clean up SQL content
-            lines = []
-            for line in raw_content.split("\n"):
-                line = line.strip()
-                if line and not line.startswith("--"):
-                    lines.append(line)
-            sql = " ".join(lines)
-            return cls(sql)
+    def from_files(cls, migration_id: int, up_path: Path, down_path: Optional[Path]):
+        sql = _clean_sql(up_path.read_text(encoding="utf-8"))
+        down_sql = (
+            _clean_sql(down_path.read_text(encoding="utf-8")) if down_path else None
+        )
+        return cls(migration_id, sql, down_sql)
 
-    async def run(self, bump: bool = True) -> None:
-        """Run the migration."""
+    async def apply(self) -> None:
+        """Run the up SQL and record this id as applied."""
         try:
             async with db_connection() as connection:
                 await connection.query(self.sql)
-
-            if bump:
-                await bump_version()
-            else:
-                await lower_version()
-
+            await mark_applied(self.id)
         except Exception as e:
-            logger.error(f"Migration failed: {str(e)}")
+            logger.error(f"Migration {self.id} failed: {str(e)}")
+            raise
+
+    async def revert(self) -> None:
+        """Run the down SQL and remove this id from the applied set."""
+        if not self.down_sql:
+            raise ValueError(f"Migration {self.id} has no rollback (_down) file")
+        try:
+            async with db_connection() as connection:
+                await connection.query(self.down_sql)
+            await mark_reverted(self.id)
+        except Exception as e:
+            logger.error(f"Rollback of migration {self.id} failed: {str(e)}")
             raise
 
 
-class AsyncMigrationRunner:
-    """
-    Handles running multiple migrations in sequence.
-    """
+def discover_migrations() -> List[AsyncMigration]:
+    """Find and order all migrations on disk by their integer id (ascending)."""
+    by_stem = {p.stem: p for p in MIGRATIONS_DIR.glob("*.surrealql")}
+    migrations: List[AsyncMigration] = []
+    for stem, path in by_stem.items():
+        if stem.endswith("_down"):
+            continue
+        prefix = stem.split("_", 1)[0]
+        try:
+            migration_id = int(prefix)
+        except ValueError:
+            logger.warning(
+                f"Skipping migration file with non-integer id prefix: {path.name}"
+            )
+            continue
+        down_path = by_stem.get(f"{stem}_down")
+        migrations.append(AsyncMigration.from_files(migration_id, path, down_path))
 
-    def __init__(
-        self,
-        up_migrations: List[AsyncMigration],
-        down_migrations: List[AsyncMigration],
-    ) -> None:
-        """Initialize runner with migration lists."""
-        self.up_migrations = up_migrations
-        self.down_migrations = down_migrations
+    migrations.sort(key=lambda m: m.id)
 
-    async def run_all(self) -> None:
-        """Run all pending up migrations."""
-        current_version = await get_latest_version()
-
-        for i in range(current_version, len(self.up_migrations)):
-            logger.info(f"Running migration {i + 1}")
-            await self.up_migrations[i].run(bump=True)
-
-    async def run_one_up(self) -> None:
-        """Run one up migration."""
-        current_version = await get_latest_version()
-
-        if current_version < len(self.up_migrations):
-            logger.info(f"Running migration {current_version + 1}")
-            await self.up_migrations[current_version].run(bump=True)
-
-    async def run_one_down(self) -> None:
-        """Run one down migration."""
-        current_version = await get_latest_version()
-
-        if current_version > 0:
-            logger.info(f"Rolling back migration {current_version}")
-            await self.down_migrations[current_version - 1].run(bump=False)
+    seen: Set[int] = set()
+    for m in migrations:
+        if m.id in seen:
+            raise ValueError(f"Duplicate migration id detected: {m.id}")
+        seen.add(m.id)
+    return migrations
 
 
 class AsyncMigrationManager:
-    """
-    Main migration manager with async support.
-    """
+    """Applies pending migrations and reports migration state."""
 
     def __init__(self):
-        """Initialize migration manager."""
-        self.up_migrations = [
-            AsyncMigration.from_file("open_notebook/database/migrations/1.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/2.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/3.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/4.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/5.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/6.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/7.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/8.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/9.surrealql"),
-            AsyncMigration.from_file("open_notebook/database/migrations/10.surrealql"),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/11.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/12.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/13.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/14.surrealql"
-            ),
-        ]
-        self.down_migrations = [
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/1_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/2_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/3_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/4_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/5_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/6_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/7_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/8_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/9_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/10_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/11_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/12_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/13_down.surrealql"
-            ),
-            AsyncMigration.from_file(
-                "open_notebook/database/migrations/14_down.surrealql"
-            ),
-        ]
-        self.runner = AsyncMigrationRunner(
-            up_migrations=self.up_migrations,
-            down_migrations=self.down_migrations,
-        )
+        self.migrations = discover_migrations()
 
     async def get_current_version(self) -> int:
-        """Get current database version."""
+        """Highest applied migration id (0 if none). For display/logging."""
         return await get_latest_version()
 
+    async def get_pending(self) -> List[AsyncMigration]:
+        applied = await get_applied_ids()
+        return [m for m in self.migrations if m.id not in applied]
+
     async def needs_migration(self) -> bool:
-        """Check if migration is needed."""
-        current_version = await self.get_current_version()
-        return current_version < len(self.up_migrations)
+        return len(await self.get_pending()) > 0
 
-    async def run_migration_up(self):
-        """Run all pending migrations."""
-        current_version = await self.get_current_version()
-        logger.info(f"Current version before migration: {current_version}")
-
-        if await self.needs_migration():
-            try:
-                await self.runner.run_all()
-                new_version = await self.get_current_version()
-                logger.info(f"Migration successful. New version: {new_version}")
-            except Exception as e:
-                logger.error(f"Migration failed: {str(e)}")
-                raise
-        else:
+    async def run_migration_up(self) -> None:
+        """Apply every discovered migration whose id is not yet applied."""
+        pending = await self.get_pending()
+        if not pending:
             logger.info("Database is already at the latest version")
+            return
+
+        logger.info(
+            f"Applying {len(pending)} pending migration(s): "
+            f"{[m.id for m in pending]}"
+        )
+        for migration in pending:
+            logger.info(f"Running migration {migration.id}")
+            await migration.apply()
+        logger.info(
+            f"Migration successful. Current version: {await self.get_current_version()}"
+        )
+
+    async def run_migration_down(self) -> None:
+        """Roll back the most recently applied migration that has a _down file."""
+        applied = await get_applied_ids()
+        revertible = sorted(
+            (m for m in self.migrations if m.id in applied and m.down_sql),
+            key=lambda m: m.id,
+        )
+        if not revertible:
+            logger.info("No revertible migration to roll back")
+            return
+        target = revertible[-1]
+        logger.info(f"Rolling back migration {target.id}")
+        await target.revert()
 
 
-# Database version management functions
-async def get_latest_version() -> int:
-    """Get the latest version from the migrations table."""
-    try:
-        versions = await get_all_versions()
-        if not versions:
-            return 0
-        return max(version["version"] for version in versions)
-    except Exception:
-        # If migrations table doesn't exist, we're at version 0
-        return 0
-
-
+# --- applied-set tracking (_sbl_migrations) ----------------------------------
 async def get_all_versions() -> List[dict]:
-    """Get all versions from the migrations table."""
+    """All applied migration records (id stored in the `version` field)."""
     try:
-        result = await repo_query("SELECT * FROM _sbl_migrations ORDER BY version;")
-        return result
+        return await repo_query("SELECT * FROM _sbl_migrations ORDER BY version;")
     except Exception:
-        # If table doesn't exist, return empty list
+        # Table doesn't exist yet -> nothing applied.
         return []
 
 
-async def bump_version() -> None:
-    """Bump the version by adding a new entry to migrations table."""
-    current_version = await get_latest_version()
-    new_version = current_version + 1
+async def get_applied_ids() -> Set[int]:
+    """Set of migration ids already applied (backward compatible: legacy rows
+    store sequential ids 1..N in the same `version` field)."""
+    try:
+        return {int(row["version"]) for row in await get_all_versions()}
+    except Exception:
+        return set()
 
+
+async def get_latest_version() -> int:
+    """Highest applied migration id, or 0 if none."""
+    applied = await get_applied_ids()
+    return max(applied) if applied else 0
+
+
+async def mark_applied(migration_id: int) -> None:
     await repo_query(
-        "CREATE type::thing('_sbl_migrations', $version) SET version = $version, applied_at = time::now();",
-        {"version": new_version},
+        "CREATE type::thing('_sbl_migrations', $id) "
+        "SET version = $id, applied_at = time::now();",
+        {"id": migration_id},
     )
 
 
-async def lower_version() -> None:
-    """Lower the version by removing the latest entry from migrations table."""
-    current_version = await get_latest_version()
-    if current_version > 0:
-        await repo_query(
-            "DELETE type::thing('_sbl_migrations', $version);",
-            {"version": current_version},
-        )
+async def mark_reverted(migration_id: int) -> None:
+    await repo_query(
+        "DELETE type::thing('_sbl_migrations', $id);",
+        {"id": migration_id},
+    )

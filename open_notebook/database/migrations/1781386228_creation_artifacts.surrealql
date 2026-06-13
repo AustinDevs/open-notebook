@@ -1,0 +1,22 @@
+-- Migration: Creation plugin system
+-- Generic artifact table for all "creators" (flashcards, infographics, ...)
+-- plus per-(artifact, card, user) flashcard spaced-repetition review state.
+
+-- CREATION ARTIFACT (schemaless: plugin-specific shape lives in `data`)
+DEFINE TABLE IF NOT EXISTS creation_artifact SCHEMALESS;
+DEFINE FIELD IF NOT EXISTS creator_key ON TABLE creation_artifact TYPE string;
+DEFINE FIELD IF NOT EXISTS schema_id ON TABLE creation_artifact TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS notebook_id ON TABLE creation_artifact TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS name ON TABLE creation_artifact TYPE string;
+DEFINE FIELD IF NOT EXISTS status ON TABLE creation_artifact TYPE string DEFAULT 'submitted';
+DEFINE FIELD IF NOT EXISTS created ON TABLE creation_artifact TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS updated ON TABLE creation_artifact TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS creation_artifact_notebook ON TABLE creation_artifact FIELDS notebook_id;
+DEFINE INDEX IF NOT EXISTS creation_artifact_creator ON TABLE creation_artifact FIELDS creator_key;
+
+-- FLASHCARD REVIEW (per card, per user spaced-repetition state)
+DEFINE TABLE IF NOT EXISTS flashcard_review SCHEMALESS;
+DEFINE FIELD IF NOT EXISTS artifact_id ON TABLE flashcard_review TYPE string;
+DEFINE FIELD IF NOT EXISTS card_id ON TABLE flashcard_review TYPE string;
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE flashcard_review TYPE option<string>;
+DEFINE INDEX IF NOT EXISTS flashcard_review_lookup ON TABLE flashcard_review FIELDS artifact_id, user_id;

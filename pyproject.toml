@@ -41,7 +41,16 @@ dependencies = [
     "numpy>=2.4.1",
     "pycountry>=26.2.16",
     "babel>=2.18.0",
+    # Creation plugin system (first-party creators, git-pinned to @main)
+    "open-notebook-creator-sdk",
+    "flashcard-creator",
+    "infographic-creator",
 ]
+
+[tool.uv.sources]
+open-notebook-creator-sdk = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git", branch = "main" }
+flashcard-creator = { git = "https://github.com/Notebooker-ai/flashcard-creator.git", branch = "main" }
+infographic-creator = { git = "https://github.com/Notebooker-ai/infographic-creator.git", branch = "main" }
 
 [tool.setuptools]
 package-dir = {"open_notebook" = "open_notebook"}

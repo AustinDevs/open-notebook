@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -41,7 +41,17 @@ import {
   Plus,
   Wrench,
   Command,
+  Layers,
+  BarChart3,
+  Sparkles,
+  type LucideIcon,
 } from 'lucide-react'
+import { useCreators } from '@/lib/hooks/use-creation'
+
+const CREATOR_ICONS: Record<string, LucideIcon> = {
+  layers: Layers,
+  'bar-chart-3': BarChart3,
+}
 
 const getNavigation = (t: TFunction) => [
   {
@@ -78,7 +88,24 @@ type CreateTarget = 'source' | 'notebook' | 'podcast'
 
 export function AppSidebar() {
   const { t } = useTranslation()
-  const navigation = getNavigation(t)
+  const { creators } = useCreators()
+  const navigation = useMemo(() => {
+    return getNavigation(t).map(section => {
+      const items: { name: string; href: string; icon: LucideIcon }[] =
+        section.items.map(i => ({ name: i.name, href: i.href, icon: i.icon as LucideIcon }))
+      if (section.title === t('navigation.create')) {
+        for (const c of creators) {
+          if (!c.available) continue
+          items.push({
+            name: c.name,
+            href: `/creation/${c.key}`,
+            icon: CREATOR_ICONS[c.icon ?? ''] ?? Sparkles,
+          })
+        }
+      }
+      return { title: section.title, items }
+    })
+  }, [t, creators])
   const pathname = usePathname()
   const { logout } = useAuth()
   const { isCollapsed, toggleCollapse } = useSidebarStore()
