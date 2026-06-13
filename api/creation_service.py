@@ -24,6 +24,10 @@ _DEFAULT_BY_KIND = {
     "embedding": ("default_embedding_model",),
 }
 
+# Mirror provision_langchain_model: above this many tokens, language work runs on
+# the user's large_context_model instead of the selected/default model.
+LARGE_CONTEXT_THRESHOLD = 105_000
+
 
 async def _default_model_for_kind(defaults: DefaultModels, kind: str) -> Optional[str]:
     for attr in _DEFAULT_BY_KIND.get(kind, ()):  # first non-empty wins
@@ -51,10 +55,31 @@ class CreationService:
         # Validate config against the creator's schema (surfaces as 422 upstream).
         creator.config_model.model_validate(config or {})
 
-        # Resolve model selections, filling defaults for unset roles.
-        selections: Dict[str, str] = dict(models or {})
+        # Assemble content first so model selection can adapt to its size.
+        bundle = await assemble_content(notebook_id=notebook_id, content=content)
         defaults = await DefaultModels.get_instance()
+        large_ctx_model = getattr(defaults, "large_context_model", None)
+        use_large_ctx = bundle.token_count > LARGE_CONTEXT_THRESHOLD
+
+        if use_large_ctx and not large_ctx_model:
+            logger.warning(
+                f"creation: large content ({bundle.token_count} tokens) but no "
+                "large_context_model configured — generation may exceed the "
+                "selected model's context window."
+            )
+
+        # Resolve model selections, filling defaults for unset roles. For language
+        # work on large content, switch to large_context_model (same behavior as
+        # provision_langchain_model) regardless of the requested model.
+        selections: Dict[str, str] = dict(models or {})
         for spec in manifest.model_roles:
+            if spec.kind == "language" and use_large_ctx and large_ctx_model:
+                selections[spec.key] = large_ctx_model
+                logger.info(
+                    f"creation: large content ({bundle.token_count} tokens) -> "
+                    f"using large_context_model for role '{spec.key}'"
+                )
+                continue
             if spec.key in selections and selections[spec.key]:
                 continue
             default_id = await _default_model_for_kind(defaults, spec.kind)
@@ -66,7 +91,6 @@ class CreationService:
                     f"'{spec.key}' (kind={spec.kind})"
                 )
 
-        bundle = await assemble_content(notebook_id=notebook_id, content=content)
         artifact_uuid = str(uuid.uuid4())
 
         # Ensure the command module (and registry) are imported before submitting.
