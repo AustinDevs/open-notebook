@@ -516,6 +516,8 @@ export const deDE = {
     allNotebooks: "Alle Notizbücher",
     modelFor: "Modell für",
     useDefaultModel: "Standardmodell verwenden",
+    instructionsLabel: "Zusätzliche Anweisungen",
+    instructionsPlaceholder: "Optional: Schwerpunkte, Tonfall oder was hervorzuheben ist…",
     noArtifactsYet: "Noch keine Kreationen. Erstellen Sie die erste.",
     creatorNotFound: "Dieser Creator ist nicht verfügbar.",
     artifactDeleted: "Kreation gelöscht",

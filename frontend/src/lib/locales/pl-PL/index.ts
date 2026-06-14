@@ -513,6 +513,8 @@ export const plPL = {
     allNotebooks: "Wszystkie notatniki",
     modelFor: "Model dla",
     useDefaultModel: "Użyj modelu domyślnego",
+    instructionsLabel: "Dodatkowe instrukcje",
+    instructionsPlaceholder: "Opcjonalnie: obszary skupienia, ton lub co podkreślić…",
     noArtifactsYet: "Brak kreacji. Wygeneruj pierwszą.",
     creatorNotFound: "Ten kreator jest niedostępny.",
     artifactDeleted: "Kreacja usunięta",

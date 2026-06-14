@@ -49,6 +49,7 @@ class CreationGenerationInput(CommandInput):
     models: Dict[str, str] = {}  # role key -> Model record id
     notebook_id: Optional[str] = None
     language: Optional[str] = None
+    instructions: Optional[str] = None
     artifact_uuid: str
     registry_digest: Optional[str] = None
     user_id: Optional[str] = None
@@ -146,6 +147,7 @@ async def generate_creation_artifact_command(
             output_dir=str(output_dir),
             artifact_id=input_data.artifact_uuid,
             language=input_data.language,
+            instructions=input_data.instructions,
             user_id=input_data.user_id,
         )
 

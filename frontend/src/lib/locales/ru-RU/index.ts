@@ -513,6 +513,8 @@ export const ruRU = {
     allNotebooks: "Все блокноты",
     modelFor: "Модель для",
     useDefaultModel: "Использовать модель по умолчанию",
+    instructionsLabel: "Дополнительные инструкции",
+    instructionsPlaceholder: "Необязательно: на чём сфокусироваться, тон, что подчеркнуть…",
     noArtifactsYet: "Пока нет материалов. Создайте первый.",
     creatorNotFound: "Этот генератор недоступен.",
     artifactDeleted: "Материал удалён",

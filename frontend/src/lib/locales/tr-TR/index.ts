@@ -513,6 +513,8 @@ export const trTR = {
     allNotebooks: "Tüm not defterleri",
     modelFor: "Şunun için model",
     useDefaultModel: "Varsayılan modeli kullan",
+    instructionsLabel: "Ek talimatlar",
+    instructionsPlaceholder: "İsteğe bağlı: odak alanları, ton veya neyin vurgulanacağı…",
     noArtifactsYet: "Henüz oluşturma yok. İlkini üretin.",
     creatorNotFound: "Bu oluşturucu kullanılamıyor.",
     artifactDeleted: "Oluşturma silindi",

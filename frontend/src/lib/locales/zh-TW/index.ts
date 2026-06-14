@@ -513,6 +513,8 @@ export const zhTW = {
     allNotebooks: "所有筆記本",
     modelFor: "模型用於",
     useDefaultModel: "使用預設模型",
+    instructionsLabel: "附加說明",
+    instructionsPlaceholder: "選填：重點領域、語氣或需要強調的內容…",
     noArtifactsYet: "尚未有創作。產生第一個吧。",
     creatorNotFound: "此創作器無法使用。",
     artifactDeleted: "創作已刪除",

@@ -513,6 +513,8 @@ export const jaJP = {
     allNotebooks: "すべてのノートブック",
     modelFor: "使用するモデル",
     useDefaultModel: "デフォルトのモデルを使用",
+    instructionsLabel: "追加の指示",
+    instructionsPlaceholder: "任意：重点分野、トーン、強調したい点など…",
     noArtifactsYet: "まだ作成物がありません。最初のものを生成しましょう。",
     creatorNotFound: "この作成ツールは利用できません。",
     artifactDeleted: "作成物を削除しました",

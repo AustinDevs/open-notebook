@@ -513,6 +513,8 @@ export const enUS = {
     allNotebooks: "All notebooks",
     modelFor: "Model for",
     useDefaultModel: "Use default model",
+    instructionsLabel: "Additional instructions",
+    instructionsPlaceholder: "Optional: focus areas, tone, or what to emphasize…",
     noArtifactsYet: "No creations yet. Generate your first one.",
     creatorNotFound: "This creator is not available.",
     artifactDeleted: "Creation deleted",

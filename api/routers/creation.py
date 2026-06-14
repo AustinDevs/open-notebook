@@ -31,6 +31,7 @@ class GenerateCreationRequest(BaseModel):
     notebook_id: Optional[str] = None
     content: Optional[str] = None
     language: Optional[str] = None
+    instructions: Optional[str] = None
 
 
 class GenerateCreationResponse(BaseModel):
@@ -88,6 +89,7 @@ async def generate_artifact(request: GenerateCreationRequest):
             notebook_id=request.notebook_id,
             content=request.content,
             language=request.language,
+            instructions=request.instructions,
         )
         return GenerateCreationResponse(
             job_id=job_id, artifact_id=artifact_uuid, status="submitted"

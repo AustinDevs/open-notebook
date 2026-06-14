@@ -513,6 +513,8 @@ export const caES = {
     allNotebooks: "Tots els quaderns",
     modelFor: "Model per a",
     useDefaultModel: "Utilitza el model per defecte",
+    instructionsLabel: "Instruccions addicionals",
+    instructionsPlaceholder: "Opcional: àrees d'enfocament, to o què emfatitzar…",
     noArtifactsYet: "Encara no hi ha creacions. Genera la primera.",
     creatorNotFound: "Aquest creador no està disponible.",
     artifactDeleted: "Creació eliminada",

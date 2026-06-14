@@ -513,6 +513,8 @@ export const esES = {
     allNotebooks: "Todos los cuadernos",
     modelFor: "Modelo para",
     useDefaultModel: "Usar modelo predeterminado",
+    instructionsLabel: "Instrucciones adicionales",
+    instructionsPlaceholder: "Opcional: áreas de enfoque, tono o qué enfatizar…",
     noArtifactsYet: "Aún no hay creaciones. Genera la primera.",
     creatorNotFound: "Este creador no está disponible.",
     artifactDeleted: "Creación eliminada",

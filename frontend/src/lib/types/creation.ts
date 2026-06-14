@@ -80,6 +80,7 @@ export interface GenerateCreationRequest {
   notebook_id?: string
   content?: string
   language?: string
+  instructions?: string
 }
 
 export interface GenerateCreationResponse {

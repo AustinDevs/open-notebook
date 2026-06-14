@@ -513,6 +513,8 @@ export const ptBR = {
     allNotebooks: "Todos os cadernos",
     modelFor: "Modelo para",
     useDefaultModel: "Usar modelo padrão",
+    instructionsLabel: "Instruções adicionais",
+    instructionsPlaceholder: "Opcional: áreas de foco, tom ou o que enfatizar…",
     noArtifactsYet: "Nenhuma criação ainda. Gere a primeira.",
     creatorNotFound: "Este criador não está disponível.",
     artifactDeleted: "Criação excluída",

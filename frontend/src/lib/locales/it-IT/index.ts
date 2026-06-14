@@ -513,6 +513,8 @@ export const itIT = {
     allNotebooks: "Tutti i taccuini",
     modelFor: "Modello per",
     useDefaultModel: "Usa il modello predefinito",
+    instructionsLabel: "Istruzioni aggiuntive",
+    instructionsPlaceholder: "Facoltativo: aree di interesse, tono o cosa enfatizzare…",
     noArtifactsYet: "Ancora nessuna creazione. Genera la prima.",
     creatorNotFound: "Questo creatore non è disponibile.",
     artifactDeleted: "Creazione eliminata",

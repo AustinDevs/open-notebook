@@ -47,6 +47,7 @@ class CreationService:
         notebook_id: Optional[str] = None,
         content: Optional[str] = None,
         language: Optional[str] = None,
+        instructions: Optional[str] = None,
     ) -> tuple[str, str]:
         """Returns (job_id, artifact_uuid)."""
         creator = get_creator(creator_key)  # raises ValueError if unknown/unavailable
@@ -107,6 +108,7 @@ class CreationService:
                 "models": selections,
                 "notebook_id": notebook_id,
                 "language": language,
+                "instructions": instructions,
                 "artifact_uuid": artifact_uuid,
                 "registry_digest": registry_digest(),
             },

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -67,6 +68,7 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
   const [selectedNotebook, setSelectedNotebook] = useState<string | undefined>(notebookId)
   const [models, setModels] = useState<Record<string, string>>({})
   const [config, setConfig] = useState<Record<string, unknown>>({})
+  const [instructions, setInstructions] = useState('')
 
   const properties = useMemo(
     () => (manifest.config_schema?.properties ?? {}) as Record<string, SchemaProp>,
@@ -78,6 +80,7 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
       setName('')
       setModels({})
       setConfig({})
+      setInstructions('')
       setSelectedNotebook(notebookId)
     }
   }, [open, notebookId])
@@ -94,6 +97,7 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
       config,
       models,
       notebook_id: selectedNotebook,
+      instructions: instructions.trim() || undefined,
     })
     onOpenChange(false)
   }
@@ -207,6 +211,16 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
               </div>
             )
           })}
+
+          <div className="space-y-2">
+            <Label>{t('creation.instructionsLabel')}</Label>
+            <Textarea
+              value={instructions}
+              onChange={e => setInstructions(e.target.value)}
+              placeholder={t('creation.instructionsPlaceholder')}
+              rows={3}
+            />
+          </div>
         </div>
 
         <DialogFooter>

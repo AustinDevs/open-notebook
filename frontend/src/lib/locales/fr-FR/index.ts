@@ -513,6 +513,8 @@ export const frFR = {
     allNotebooks: "Tous les carnets",
     modelFor: "Modèle pour",
     useDefaultModel: "Utiliser le modèle par défaut",
+    instructionsLabel: "Instructions supplémentaires",
+    instructionsPlaceholder: "Facultatif : axes prioritaires, ton ou ce qu'il faut mettre en avant…",
     noArtifactsYet: "Aucune création pour l’instant. Générez la première.",
     creatorNotFound: "Ce créateur n’est pas disponible.",
     artifactDeleted: "Création supprimée",

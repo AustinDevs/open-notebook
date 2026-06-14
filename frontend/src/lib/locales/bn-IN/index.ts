@@ -513,6 +513,8 @@ export const bnIN = {
     allNotebooks: "সব নোটবুক",
     modelFor: "এর জন্য মডেল",
     useDefaultModel: "ডিফল্ট মডেল ব্যবহার করুন",
+    instructionsLabel: "অতিরিক্ত নির্দেশনা",
+    instructionsPlaceholder: "ঐচ্ছিক: ফোকাস ক্ষেত্র, টোন বা কী জোর দিতে হবে…",
     noArtifactsYet: "এখনও কোনো সৃষ্টি নেই। প্রথমটি তৈরি করুন।",
     creatorNotFound: "এই ক্রিয়েটরটি উপলব্ধ নয়।",
     artifactDeleted: "সৃষ্টি মুছে ফেলা হয়েছে",

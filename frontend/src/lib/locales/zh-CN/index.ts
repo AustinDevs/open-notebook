@@ -513,6 +513,8 @@ export const zhCN = {
     allNotebooks: "所有笔记本",
     modelFor: "模型用于",
     useDefaultModel: "使用默认模型",
+    instructionsLabel: "附加说明",
+    instructionsPlaceholder: "可选：重点领域、语气或需要强调的内容…",
     noArtifactsYet: "还没有创作。生成第一个吧。",
     creatorNotFound: "此创作器不可用。",
     artifactDeleted: "创作已删除",
