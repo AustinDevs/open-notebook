@@ -88,7 +88,7 @@ RUN set -eux; \
 # Pre-warm the tectonic package cache via a real Quarto PDF render so runtime PDF
 # generation works without network access.
 RUN set -eux; \
-    printf '---\ntitle: warmup\nformat:\n  pdf:\n    pdf-engine: tectonic\n---\n\n# Warmup\n\nInline math $E=mc^2$ and a list:\n\n- one\n- two\n' > /tmp/warm.qmd; \
+    printf '%b' '---\ntitle: warmup\nformat:\n  pdf:\n    pdf-engine: tectonic\n---\n\n# Warmup\n\nInline math $E=mc^2$ and a list:\n\n- one\n- two\n' > /tmp/warm.qmd; \
     quarto render /tmp/warm.qmd --to pdf; \
     rm -rf /tmp/warm.qmd /tmp/warm.pdf /tmp/warm.tex /tmp/warm_files
 
