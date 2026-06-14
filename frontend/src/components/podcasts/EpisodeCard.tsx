@@ -228,10 +228,13 @@ export function EpisodeCard({ episode, onDelete, deleting, onRetry, retrying }: 
   const isFailed = FAILED_EPISODE_STATUSES.includes(episode.job_status as EpisodeStatus)
 
   return (
-    <Card className="shadow-sm">
+    <Card className="@container shadow-sm">
       <CardContent className="space-y-4 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
+        {/* Container-query (not viewport) so the card stacks when it sits in a
+            narrow column (e.g. the notebook Creations column) and only goes
+            side-by-side when the card itself is wide (e.g. the Podcasts page). */}
+        <div className="flex flex-col gap-3 @lg:flex-row @lg:items-center @lg:justify-between">
+          <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-semibold text-foreground">
                 {episode.name}
@@ -243,7 +246,7 @@ export function EpisodeCard({ episode, onDelete, deleting, onRetry, retrying }: 
               {createdLabel ? ` • ${createdLabel}` : ''}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
