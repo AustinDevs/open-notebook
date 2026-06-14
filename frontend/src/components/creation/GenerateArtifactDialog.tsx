@@ -25,7 +25,9 @@ import { ModelSelector } from '@/components/common/ModelSelector'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebooks } from '@/lib/hooks/use-notebooks'
 import { useGenerateCreationArtifact } from '@/lib/hooks/use-creation'
+import { useModelDefaults } from '@/lib/hooks/use-models'
 import { CreatorManifest } from '@/lib/types/creation'
+import { ModelDefaults } from '@/lib/types/models'
 
 interface Props {
   manifest: CreatorManifest
@@ -59,10 +61,29 @@ function prettyOption(value: string | number): string {
     .replace(/\b\w/g, c => c.toUpperCase())
 }
 
+// The user's configured default Model id for a role kind, mirroring the
+// backend's per-kind fallback (see api/creation_service.py _DEFAULT_BY_KIND).
+function defaultModelForKind(kind: ModelKind, d?: ModelDefaults | null): string {
+  if (!d) return ''
+  switch (kind) {
+    case 'language':
+      return d.default_transformation_model || d.default_chat_model || ''
+    case 'embedding':
+      return d.default_embedding_model || ''
+    case 'text_to_speech':
+      return d.default_text_to_speech_model || ''
+    case 'speech_to_text':
+      return d.default_speech_to_text_model || ''
+    default:
+      return ''
+  }
+}
+
 export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChange }: Props) {
   const { t } = useTranslation()
   const { data: notebooks } = useNotebooks()
   const generate = useGenerateCreationArtifact(manifest.key, notebookId)
+  const { data: modelDefaults } = useModelDefaults()
 
   const [name, setName] = useState('')
   const [selectedNotebook, setSelectedNotebook] = useState<string | undefined>(notebookId)
@@ -82,8 +103,26 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
       setConfig({})
       setInstructions('')
       setSelectedNotebook(notebookId)
+      return
     }
-  }, [open, notebookId])
+    // On open, pre-fill sensible defaults (the user can still change them): the
+    // creator name, and per model role the user's configured default model so
+    // they don't have to pick one for the common case.
+    setSelectedNotebook(notebookId)
+    setName(prev => prev || manifest.name)
+    setModels(prev => {
+      const next = { ...prev }
+      for (const role of manifest.model_roles) {
+        if (next[role.key]) continue
+        const kind = (
+          MODEL_KINDS.includes(role.kind as ModelKind) ? role.kind : 'language'
+        ) as ModelKind
+        const def = defaultModelForKind(kind, modelDefaults)
+        if (def) next[role.key] = def
+      }
+      return next
+    })
+  }, [open, notebookId, manifest, modelDefaults])
 
   const canSubmit =
     name.trim().length > 0 &&
