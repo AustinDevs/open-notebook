@@ -12,7 +12,7 @@ import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useNotes } from '@/lib/hooks/use-notes'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useNotebookColumnsStore } from '@/lib/stores/notebook-columns-store'
-import { useIsDesktop } from '@/lib/hooks/use-media-query'
+import { useIsWideDesktop } from '@/lib/hooks/use-media-query'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -46,8 +46,10 @@ export default function NotebookPage() {
   // Get collapse states for dynamic layout
   const { sourcesCollapsed, creationsCollapsed } = useNotebookColumnsStore()
 
-  // Detect desktop to avoid double-mounting ChatColumn
-  const isDesktop = useIsDesktop()
+  // Detect a wide (xl) viewport to avoid double-mounting ChatColumn and to gate
+  // the 3-column layout; below xl we fall back to the tabbed layout so chat
+  // isn't squished between sources and creations.
+  const isDesktop = useIsWideDesktop()
 
   // Mobile tab state (Sources, Chat, or Creations)
   const [mobileActiveTab, setMobileActiveTab] = useState<'sources' | 'chat' | 'creations'>('chat')
@@ -156,7 +158,7 @@ export default function NotebookPage() {
           {/* Mobile: Tabbed interface - only render on mobile to avoid double-mounting */}
           {!isDesktop && (
             <>
-              <div className="lg:hidden mb-4">
+              <div className="xl:hidden mb-4">
                 <Tabs value={mobileActiveTab} onValueChange={(value) => setMobileActiveTab(value as 'sources' | 'chat' | 'creations')}>
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="sources" className="gap-2">
@@ -176,7 +178,7 @@ export default function NotebookPage() {
               </div>
 
               {/* Mobile: Show only active tab */}
-              <div className="flex-1 overflow-hidden lg:hidden">
+              <div className="flex-1 overflow-hidden xl:hidden">
                 {mobileActiveTab === 'sources' && sourcesColumn}
                 {mobileActiveTab === 'chat' && (
                   <ChatColumn
@@ -195,13 +197,13 @@ export default function NotebookPage() {
 
           {/* Desktop: Collapsible columns layout */}
           <div className={cn(
-            'hidden lg:flex h-full min-h-0 gap-6 transition-all duration-150',
+            'hidden xl:flex h-full min-h-0 gap-6 transition-all duration-150',
             'flex-row'
           )}>
             {/* Sources Column (sources + notes) */}
             <div className={cn(
               'transition-all duration-150',
-              sourcesCollapsed ? 'w-12 flex-shrink-0' : 'flex-none basis-1/3'
+              sourcesCollapsed ? 'w-12 flex-shrink-0' : 'flex-none basis-1/4'
             )}>
               {sourcesColumn}
             </div>
@@ -219,7 +221,7 @@ export default function NotebookPage() {
             {/* Creations Column */}
             <div className={cn(
               'transition-all duration-150 lg:pr-6 lg:-mr-6',
-              creationsCollapsed ? 'w-12 flex-shrink-0' : 'flex-none basis-1/3'
+              creationsCollapsed ? 'w-12 flex-shrink-0' : 'flex-none basis-1/4'
             )}>
               <CreationsColumn notebookId={notebookId} />
             </div>

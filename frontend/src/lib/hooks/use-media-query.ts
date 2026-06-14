@@ -30,3 +30,12 @@ export function useMediaQuery(query: string): boolean {
 export function useIsDesktop(): boolean {
   return useMediaQuery('(min-width: 1024px)')
 }
+
+/**
+ * Returns true if viewport is >= 1280px (Tailwind's 'xl' breakpoint).
+ * The notebook's 3-column layout (sources + chat + creations) needs more room
+ * than 'lg' before the columns can sit side by side without squishing chat.
+ */
+export function useIsWideDesktop(): boolean {
+  return useMediaQuery('(min-width: 1280px)')
+}

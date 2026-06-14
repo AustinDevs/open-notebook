@@ -1,6 +1,7 @@
 'use client'
 
-import { Loader2, Trash2, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { Loader2, Trash2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,18 +39,34 @@ export function CreationArtifactCard({ artifact, notebookId }: Props) {
   const isActive = artifact.status === 'running' || artifact.status === 'submitted'
   const isDone = artifact.status === 'completed' || artifact.status === 'partial'
 
+  // Generated assets collapse into a card by default and open on click, so the
+  // notebook column isn't flooded with full renders.
+  const [expanded, setExpanded] = useState(false)
+  const Chevron = expanded ? ChevronDown : ChevronRight
+
   return (
     <div className="rounded-lg border bg-card p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="font-medium">{artifact.name}</h3>
-          <Badge
-            variant="outline"
-            className={STATUS_VARIANT[artifact.status] ?? ''}
-          >
-            {t(STATUS_LABEL_KEY[artifact.status] ?? 'creation.status.submitted')}
-          </Badge>
-        </div>
+        <button
+          type="button"
+          onClick={() => isDone && setExpanded((v) => !v)}
+          disabled={!isDone}
+          aria-expanded={isDone ? expanded : undefined}
+          className="flex flex-1 items-start gap-2 text-left disabled:cursor-default"
+        >
+          {isDone && (
+            <Chevron className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          )}
+          <div className="space-y-1">
+            <h3 className="font-medium">{artifact.name}</h3>
+            <Badge
+              variant="outline"
+              className={STATUS_VARIANT[artifact.status] ?? ''}
+            >
+              {t(STATUS_LABEL_KEY[artifact.status] ?? 'creation.status.submitted')}
+            </Badge>
+          </div>
+        </button>
         <Button
           variant="ghost"
           size="sm"
@@ -81,7 +98,7 @@ export function CreationArtifactCard({ artifact, notebookId }: Props) {
         </p>
       )}
 
-      {isDone && <Renderer artifact={artifact} />}
+      {isDone && expanded && <Renderer artifact={artifact} />}
     </div>
   )
 }
