@@ -1976,6 +1976,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mindmap-creator"
+version = "0.1.0"
+source = { git = "https://github.com/Notebooker-ai/mindmap-creator.git?branch=main#a2b26fc8e57ccda0bce36556b0e93cfb8a5c1f90" }
+dependencies = [
+    { name = "ai-prompter" },
+    { name = "esperanto" },
+    { name = "langchain-core" },
+    { name = "loguru" },
+    { name = "open-notebook-creator-sdk" },
+]
+
+[[package]]
 name = "more-itertools"
 version = "10.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2193,6 +2205,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "langgraph-checkpoint-sqlite" },
     { name = "loguru" },
+    { name = "mindmap-creator" },
     { name = "numpy" },
     { name = "open-notebook-creator-sdk" },
     { name = "podcast-creator" },
@@ -2201,6 +2214,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "surreal-commands" },
     { name = "surrealdb" },
+    { name = "textbook-creator" },
     { name = "tiktoken" },
     { name = "tomli" },
     { name = "uvicorn" },
@@ -2250,6 +2264,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.0.5" },
     { name = "langgraph-checkpoint-sqlite", specifier = ">=3.0.1" },
     { name = "loguru", specifier = ">=0.7.2" },
+    { name = "mindmap-creator", git = "https://github.com/Notebooker-ai/mindmap-creator.git?branch=main" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.1" },
     { name = "numpy", specifier = ">=2.4.1" },
     { name = "open-notebook-creator-sdk", git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main" },
@@ -2262,6 +2277,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5.5" },
     { name = "surreal-commands", specifier = ">=1.3.1,<2" },
     { name = "surrealdb", specifier = ">=1.0.4" },
+    { name = "textbook-creator", git = "https://github.com/Notebooker-ai/textbook-creator.git?branch=main" },
     { name = "tiktoken", specifier = ">=0.12.0" },
     { name = "tomli", specifier = ">=2.0.2" },
     { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.32.0.20241016" },
@@ -2279,8 +2295,8 @@ dev = [
 
 [[package]]
 name = "open-notebook-creator-sdk"
-version = "0.2.0"
-source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#4eaf2b1bb5a756c2b18a017c64918cef99d9ad8b" }
+version = "0.3.0"
+source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#cf2c2378aa21b501cb3eff53e4419dd140c14e58" }
 dependencies = [
     { name = "packaging" },
     { name = "pydantic" },
@@ -3472,6 +3488,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036, upload-time = "2025-04-02T08:25:09.966Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248, upload-time = "2025-04-02T08:25:07.678Z" },
+]
+
+[[package]]
+name = "textbook-creator"
+version = "0.1.0"
+source = { git = "https://github.com/Notebooker-ai/textbook-creator.git?branch=main#affaa02814a22fbd5c97dc27193b95a13d0f2cdf" }
+dependencies = [
+    { name = "ai-prompter" },
+    { name = "esperanto" },
+    { name = "langchain-core" },
+    { name = "loguru" },
+    { name = "open-notebook-creator-sdk" },
 ]
 
 [[package]]
