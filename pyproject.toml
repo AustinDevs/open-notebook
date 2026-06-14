@@ -44,12 +44,14 @@ dependencies = [
     # Creation plugin system (first-party creators, git-pinned to @main)
     "open-notebook-creator-sdk",
     "flashcard-creator",
+    "chart-creator",
     "infographic-creator",
 ]
 
 [tool.uv.sources]
 open-notebook-creator-sdk = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git", branch = "main" }
 flashcard-creator = { git = "https://github.com/Notebooker-ai/flashcard-creator.git", branch = "main" }
+chart-creator = { git = "https://github.com/Notebooker-ai/chart-creator.git", branch = "main" }
 infographic-creator = { git = "https://github.com/Notebooker-ai/infographic-creator.git", branch = "main" }
 
 [tool.setuptools]

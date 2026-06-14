@@ -34,6 +34,40 @@ export type ChartSpecV1 = {
   specs?: Array<Record<string, unknown>>;
 };
 
+// === infographic.v1 ===
+export const InfographicV1Schema = z.object({
+  title: z.string(),
+  subtitle: z.string().nullable().optional(),
+  blocks: z.array(z.object({
+  type: z.string(),
+  value: z.string().nullable().optional(),
+  label: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
+  heading: z.string().nullable().optional(),
+  body: z.string().nullable().optional(),
+  items: z.array(z.string()).nullable().optional(),
+  text: z.string().nullable().optional(),
+  attribution: z.string().nullable().optional(),
+})).optional(),
+});
+export type InfographicV1 = {
+  title: string;
+  subtitle?: (string | null);
+  blocks?: Array<{
+  type: string;
+  value?: (string | null);
+  label?: (string | null);
+  description?: (string | null);
+  icon?: (string | null);
+  heading?: (string | null);
+  body?: (string | null);
+  items?: (Array<string> | null);
+  text?: (string | null);
+  attribution?: (string | null);
+}>;
+};
+
 // === audio.v1 ===
 export const AudioV1Schema = z.object({
   transcript: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
@@ -49,5 +83,6 @@ export type AudioV1 = {
 export const SCHEMA_VALIDATORS: Record<string, z.ZodTypeAny> = {
   "flashcards.v1": FlashcardsV1Schema,
   "chart_spec.v1": ChartSpecV1Schema,
+  "infographic.v1": InfographicV1Schema,
   "audio.v1": AudioV1Schema,
 };

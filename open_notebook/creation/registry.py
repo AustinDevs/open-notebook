@@ -30,6 +30,7 @@ from packaging.version import Version
 # --- the allowlist: key -> "import.module:ClassName" --------------------------
 CREATOR_PACKAGES: Dict[str, str] = {
     "flashcards": "flashcard_creator:FlashcardCreator",
+    "charts": "chart_creator:ChartCreator",
     "infographics": "infographic_creator:InfographicCreator",
     # "podcasts": "podcast_creator.on_adapter:PodcastCreator",  # pending stateless refactor
 }

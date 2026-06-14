@@ -408,6 +408,18 @@ wheels = [
 ]
 
 [[package]]
+name = "chart-creator"
+version = "0.1.1"
+source = { git = "https://github.com/Notebooker-ai/chart-creator.git?branch=main#98485089ffbd8041022166f7f6fea2b2e0d30dd1" }
+dependencies = [
+    { name = "ai-prompter" },
+    { name = "esperanto" },
+    { name = "langchain-core" },
+    { name = "loguru" },
+    { name = "open-notebook-creator-sdk" },
+]
+
+[[package]]
 name = "chevron"
 version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
@@ -796,8 +808,8 @@ wheels = [
 
 [[package]]
 name = "flashcard-creator"
-version = "0.1.0"
-source = { git = "https://github.com/Notebooker-ai/flashcard-creator.git?branch=main#51f4ee9bd5ab01ad4bc6fbb2d86b8eabd4460f94" }
+version = "0.1.1"
+source = { git = "https://github.com/Notebooker-ai/flashcard-creator.git?branch=main#06d2f17f028b71c81abdff72cc21337bebf480e0" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
@@ -1114,8 +1126,8 @@ wheels = [
 
 [[package]]
 name = "infographic-creator"
-version = "0.1.0"
-source = { git = "https://github.com/Notebooker-ai/infographic-creator.git?branch=main#8a454b064d5404fec14fcef9faf08f524f6bbb69" }
+version = "0.2.1"
+source = { git = "https://github.com/Notebooker-ai/infographic-creator.git?branch=main#5e11a513e8fa32ef02c61040fd61da81b8ffeb7e" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
@@ -2162,6 +2174,7 @@ source = { editable = "." }
 dependencies = [
     { name = "ai-prompter" },
     { name = "babel" },
+    { name = "chart-creator" },
     { name = "content-core" },
     { name = "esperanto" },
     { name = "fastapi" },
@@ -2216,6 +2229,7 @@ dev = [
 requires-dist = [
     { name = "ai-prompter", specifier = ">=0.4,<1" },
     { name = "babel", specifier = ">=2.18.0" },
+    { name = "chart-creator", git = "https://github.com/Notebooker-ai/chart-creator.git?branch=main" },
     { name = "content-core", specifier = ">=1.14.1,<2" },
     { name = "esperanto", specifier = ">=2.20.0,<3" },
     { name = "fastapi", specifier = ">=0.104.0" },
@@ -2265,8 +2279,8 @@ dev = [
 
 [[package]]
 name = "open-notebook-creator-sdk"
-version = "0.1.0"
-source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#bd9d4f9fc8bfc0efeb18be295a6dfc2cfb972020" }
+version = "0.2.0"
+source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#4eaf2b1bb5a756c2b18a017c64918cef99d9ad8b" }
 dependencies = [
     { name = "packaging" },
     { name = "pydantic" },
