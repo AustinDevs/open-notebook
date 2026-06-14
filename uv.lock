@@ -3492,8 +3492,8 @@ wheels = [
 
 [[package]]
 name = "textbook-creator"
-version = "0.1.1"
-source = { git = "https://github.com/Notebooker-ai/textbook-creator.git?branch=main#761806a11d3fab10bbd41a27e918f312f5288f90" }
+version = "0.1.2"
+source = { git = "https://github.com/Notebooker-ai/textbook-creator.git?branch=main#ed59981f308df954d448171f7db48fb0e9a017cd" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
