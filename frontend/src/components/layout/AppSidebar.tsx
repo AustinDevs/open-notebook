@@ -43,14 +43,23 @@ import {
   Command,
   Layers,
   BarChart3,
+  LayoutDashboard,
+  Network,
+  BookOpen,
   Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 import { useCreators } from '@/lib/hooks/use-creation'
 
+// Maps a creator manifest's `icon` (a kebab-case lucide name) to its component.
+// Add an entry when a creator declares a new icon; unmapped icons fall back to
+// Sparkles. Keep in sync with each creator's manifest `icon`.
 const CREATOR_ICONS: Record<string, LucideIcon> = {
-  layers: Layers,
-  'bar-chart-3': BarChart3,
+  layers: Layers, // flashcards
+  'bar-chart-3': BarChart3, // charts
+  'layout-dashboard': LayoutDashboard, // infographics
+  network: Network, // mindmaps
+  'book-open': BookOpen, // textbook
 }
 
 const getNavigation = (t: TFunction) => [
