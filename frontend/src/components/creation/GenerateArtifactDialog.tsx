@@ -79,6 +79,15 @@ function defaultModelForKind(kind: ModelKind, d?: ModelDefaults | null): string 
   }
 }
 
+// Creator names are plural ("Infographics", "Flashcards", …); a single
+// artifact's default name reads better singular. Crude but covers our names;
+// leaves "ss" words (e.g. "Class") and non-plural names untouched.
+function singularize(name: string): string {
+  const n = name.trim()
+  if (n.length > 1 && /s$/i.test(n) && !/ss$/i.test(n)) return n.slice(0, -1)
+  return n
+}
+
 export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChange }: Props) {
   const { t } = useTranslation()
   const { data: notebooks } = useNotebooks()
@@ -90,15 +99,29 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
   const [models, setModels] = useState<Record<string, string>>({})
   const [config, setConfig] = useState<Record<string, unknown>>({})
   const [instructions, setInstructions] = useState('')
+  // Whether the name still tracks the auto-generated default (vs. user-edited).
+  const [nameAuto, setNameAuto] = useState(true)
 
   const properties = useMemo(
     () => (manifest.config_schema?.properties ?? {}) as Record<string, SchemaProp>,
     [manifest.config_schema]
   )
 
+  const notebookName = useMemo(
+    () => notebooks?.find(nb => nb.id === selectedNotebook)?.name,
+    [notebooks, selectedNotebook]
+  )
+  // Default artifact name: singular creator name, prefixed with the selected
+  // notebook (e.g. "2026 Mindanao earthquake Infographic").
+  const autoName = useMemo(() => {
+    const singular = singularize(manifest.name)
+    return notebookName ? `${notebookName} ${singular}` : singular
+  }, [manifest.name, notebookName])
+
   useEffect(() => {
     if (!open) {
       setName('')
+      setNameAuto(true)
       setModels({})
       setConfig({})
       setInstructions('')
@@ -106,10 +129,9 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
       return
     }
     // On open, pre-fill sensible defaults (the user can still change them): the
-    // creator name, and per model role the user's configured default model so
-    // they don't have to pick one for the common case.
+    // name (handled by the autoName effect below) and, per model role, the
+    // user's configured default model so they don't have to pick one.
     setSelectedNotebook(notebookId)
-    setName(prev => prev || manifest.name)
     setModels(prev => {
       const next = { ...prev }
       for (const role of manifest.model_roles) {
@@ -123,6 +145,12 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
       return next
     })
   }, [open, notebookId, manifest, modelDefaults])
+
+  // Keep the name on the auto-generated default until the user edits it, so it
+  // reflects the selected notebook (and updates if the notebook changes).
+  useEffect(() => {
+    if (open && nameAuto) setName(autoName)
+  }, [open, nameAuto, autoName])
 
   const canSubmit =
     name.trim().length > 0 &&
@@ -155,7 +183,10 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
             <Label>{t('creation.nameLabel')} *</Label>
             <Input
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => {
+                setName(e.target.value)
+                setNameAuto(false)
+              }}
               placeholder={manifest.name}
             />
           </div>
