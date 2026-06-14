@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-import { FlashcardsRenderer } from './FlashcardsRenderer'
+import { FlashcardsV1Renderer } from './FlashcardsV1Renderer'
 import type { CreationArtifact } from '@/lib/types/creation'
 
 // --- mocks ------------------------------------------------------------------
@@ -48,7 +48,7 @@ function makeArtifact(overrides: Partial<CreationArtifact> = {}): CreationArtifa
   }
 }
 
-describe('FlashcardsRenderer', () => {
+describe('FlashcardsV1Renderer', () => {
   beforeEach(() => {
     saveMutate.mockClear()
     downloadFile.mockClear()
@@ -57,36 +57,36 @@ describe('FlashcardsRenderer', () => {
   })
 
   it('lists all cards in list mode', () => {
-    render(<FlashcardsRenderer artifact={makeArtifact()} />)
+    render(<FlashcardsV1Renderer artifact={makeArtifact()} />)
     expect(screen.getByText('What is ATP?')).toBeDefined()
     expect(screen.getByText('Energy currency')).toBeDefined()
     expect(screen.getByText('Where photosynthesis?')).toBeDefined()
   })
 
   it('shows a download button when an .apkg file is present', () => {
-    render(<FlashcardsRenderer artifact={makeArtifact()} />)
+    render(<FlashcardsV1Renderer artifact={makeArtifact()} />)
     expect(screen.getByText('creation.flashcards.downloadApkg')).toBeDefined()
   })
 
   it('hides the download button when there is no .apkg file', () => {
-    render(<FlashcardsRenderer artifact={makeArtifact({ files: [] })} />)
+    render(<FlashcardsV1Renderer artifact={makeArtifact({ files: [] })} />)
     expect(screen.queryByText('creation.flashcards.downloadApkg')).toBeNull()
   })
 
   it('downloads the deck when the button is clicked', () => {
-    render(<FlashcardsRenderer artifact={makeArtifact()} />)
+    render(<FlashcardsV1Renderer artifact={makeArtifact()} />)
     fireEvent.click(screen.getByText('creation.flashcards.downloadApkg'))
     expect(downloadFile).toHaveBeenCalledWith('creation_artifact:1', 0)
   })
 
   it('always offers Print and CSV export, even without an .apkg', () => {
-    render(<FlashcardsRenderer artifact={makeArtifact({ files: [] })} />)
+    render(<FlashcardsV1Renderer artifact={makeArtifact({ files: [] })} />)
     expect(screen.getByText('creation.flashcards.print')).toBeDefined()
     expect(screen.getByText('creation.flashcards.exportCsv')).toBeDefined()
   })
 
   it('exports cards as CSV when the CSV button is clicked', () => {
-    render(<FlashcardsRenderer artifact={makeArtifact()} />)
+    render(<FlashcardsV1Renderer artifact={makeArtifact()} />)
     fireEvent.click(screen.getByText('creation.flashcards.exportCsv'))
     expect(triggerBrowserDownload).toHaveBeenCalledTimes(1)
     const [blob, filename] = triggerBrowserDownload.mock.calls[0]
@@ -95,7 +95,7 @@ describe('FlashcardsRenderer', () => {
   })
 
   it('runs the study flow: reveal then rate, persisting review state', () => {
-    render(<FlashcardsRenderer artifact={makeArtifact()} />)
+    render(<FlashcardsV1Renderer artifact={makeArtifact()} />)
 
     // enter study mode
     fireEvent.click(screen.getByText('creation.flashcards.study'))
@@ -113,7 +113,7 @@ describe('FlashcardsRenderer', () => {
   })
 
   it('shows an error for invalid artifact data', () => {
-    render(<FlashcardsRenderer artifact={makeArtifact({ data: { nope: true } })} />)
+    render(<FlashcardsV1Renderer artifact={makeArtifact({ data: { nope: true } })} />)
     expect(screen.getByText('creation.invalidArtifactData')).toBeDefined()
   })
 })

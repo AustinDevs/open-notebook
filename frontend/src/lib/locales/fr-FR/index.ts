@@ -548,6 +548,18 @@ export const frFR = {
       exportSvg: "Exporter en SVG",
       renderError: "Échec du rendu du graphique",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Exporter en Markdown",
+      exportPng: "Exporter en PNG",
+      exportSvg: "Exporter en SVG",
+      renderError: "Échec du rendu de la carte mentale",
+    },
   },
   podcasts: {
     generateEpisode: "Générer un épisode de podcast",

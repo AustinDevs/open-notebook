@@ -548,6 +548,18 @@ export const trTR = {
       exportSvg: "SVG dışa aktar",
       renderError: "Grafik oluşturulamadı",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Markdown dışa aktar",
+      exportPng: "PNG dışa aktar",
+      exportSvg: "SVG dışa aktar",
+      renderError: "Zihin haritası oluşturulamadı",
+    },
   },
   podcasts: {
     generateEpisode: "Podcast Bölümü Oluştur",

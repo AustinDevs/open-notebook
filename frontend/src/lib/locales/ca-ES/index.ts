@@ -548,6 +548,18 @@ export const caES = {
       exportSvg: "Exporta SVG",
       renderError: "No s’ha pogut renderitzar el gràfic",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Exporta Markdown",
+      exportPng: "Exporta PNG",
+      exportSvg: "Exporta SVG",
+      renderError: "No s’ha pogut renderitzar el mapa mental",
+    },
   },
   podcasts: {
     generateEpisode: "Genera un episodi de podcast",

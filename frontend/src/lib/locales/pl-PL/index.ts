@@ -548,6 +548,18 @@ export const plPL = {
       exportSvg: "Eksportuj SVG",
       renderError: "Nie udało się wyrenderować wykresu",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Eksportuj Markdown",
+      exportPng: "Eksportuj PNG",
+      exportSvg: "Eksportuj SVG",
+      renderError: "Nie udało się wyrenderować mapy myśli",
+    },
   },
   podcasts: {
     generateEpisode: "Wygeneruj odcinek podcastu",

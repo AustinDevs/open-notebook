@@ -68,6 +68,18 @@ export type InfographicV1 = {
 }>;
 };
 
+// === mindmap.v1 ===
+export const MindmapV1Schema = z.object({
+  title: z.string(),
+  mermaid_syntax: z.string(),
+  description: z.string().nullable().optional(),
+});
+export type MindmapV1 = {
+  title: string;
+  mermaid_syntax: string;
+  description?: (string | null);
+};
+
 // === audio.v1 ===
 export const AudioV1Schema = z.object({
   transcript: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
@@ -80,9 +92,31 @@ export type AudioV1 = {
   duration_seconds?: (number | null);
 };
 
+// === textbook.v1 ===
+export const TextbookV1Schema = z.object({
+  title: z.string(),
+  subtitle: z.string().nullable().optional(),
+  chapters: z.array(z.object({
+  title: z.string(),
+  summary: z.string().nullable().optional(),
+})).optional(),
+  formats: z.array(z.string()).optional(),
+});
+export type TextbookV1 = {
+  title: string;
+  subtitle?: (string | null);
+  chapters?: Array<{
+  title: string;
+  summary?: (string | null);
+}>;
+  formats?: Array<string>;
+};
+
 export const SCHEMA_VALIDATORS: Record<string, z.ZodTypeAny> = {
   "flashcards.v1": FlashcardsV1Schema,
   "chart_spec.v1": ChartSpecV1Schema,
   "infographic.v1": InfographicV1Schema,
+  "mindmap.v1": MindmapV1Schema,
   "audio.v1": AudioV1Schema,
+  "textbook.v1": TextbookV1Schema,
 };

@@ -138,7 +138,7 @@ function ChartCanvas({
   )
 }
 
-export function ChartSpecRenderer({ artifact }: { artifact: CreationArtifact }) {
+export function ChartSpecV1Renderer({ artifact }: { artifact: CreationArtifact }) {
   const { t } = useTranslation()
   const parsed = useMemo(() => ChartSpecV1Schema.safeParse(artifact.data), [artifact.data])
   const theme = resolveTheme(artifact.config?.theme)

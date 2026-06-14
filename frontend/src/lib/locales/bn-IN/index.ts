@@ -548,6 +548,18 @@ export const bnIN = {
       exportSvg: "SVG এক্সপোর্ট করুন",
       renderError: "চার্ট রেন্ডার করা যায়নি",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Markdown এক্সপোর্ট করুন",
+      exportPng: "PNG এক্সপোর্ট করুন",
+      exportSvg: "SVG এক্সপোর্ট করুন",
+      renderError: "মাইন্ডম্যাপ রেন্ডার করা যায়নি",
+    },
   },
   podcasts: {
     generateEpisode: "পডকাস্ট এপিসোড তৈরি করুন",

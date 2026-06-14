@@ -32,6 +32,8 @@ CREATOR_PACKAGES: Dict[str, str] = {
     "flashcards": "flashcard_creator:FlashcardCreator",
     "charts": "chart_creator:ChartCreator",
     "infographics": "infographic_creator:InfographicCreator",
+    "mindmaps": "mindmap_creator:MindmapCreator",
+    "textbooks": "textbook_creator:TextbookCreator",
     # "podcasts": "podcast_creator.on_adapter:PodcastCreator",  # pending stateless refactor
 }
 

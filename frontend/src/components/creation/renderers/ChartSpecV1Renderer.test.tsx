@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-import { ChartSpecRenderer } from './ChartSpecRenderer'
+import { ChartSpecV1Renderer } from './ChartSpecV1Renderer'
 import type { CreationArtifact } from '@/lib/types/creation'
 
 // --- mocks ------------------------------------------------------------------
@@ -56,7 +56,7 @@ function makeArtifact(overrides: Partial<CreationArtifact> = {}): CreationArtifa
   }
 }
 
-describe('ChartSpecRenderer', () => {
+describe('ChartSpecV1Renderer', () => {
   beforeEach(() => {
     ChartCtor.mockClear()
     chartOptions.mockClear()
@@ -65,7 +65,7 @@ describe('ChartSpecRenderer', () => {
   })
 
   it('renders the title and PNG + SVG export buttons per spec', () => {
-    render(<ChartSpecRenderer artifact={makeArtifact()} />)
+    render(<ChartSpecV1Renderer artifact={makeArtifact()} />)
     expect(screen.getByText('Quarterly Sales')).toBeDefined()
     // one PNG + one SVG export button per chart spec (2 specs)
     expect(screen.getAllByText('creation.infographics.exportPng')).toHaveLength(2)
@@ -73,26 +73,26 @@ describe('ChartSpecRenderer', () => {
   })
 
   it('renders one chart container per spec', () => {
-    render(<ChartSpecRenderer artifact={makeArtifact()} />)
+    render(<ChartSpecV1Renderer artifact={makeArtifact()} />)
     expect(screen.getAllByTestId('chart-canvas')).toHaveLength(2)
   })
 
   it('instantiates AntV charts via dynamic import', async () => {
-    render(<ChartSpecRenderer artifact={makeArtifact()} />)
+    render(<ChartSpecV1Renderer artifact={makeArtifact()} />)
     // @antv/g2 is loaded lazily inside an effect; wait for the render call itself.
     await waitFor(() => expect(chartRender).toHaveBeenCalled(), { timeout: 3000 })
     expect(ChartCtor).toHaveBeenCalled()
   })
 
   it('does not crash exporting when no canvas is present', () => {
-    render(<ChartSpecRenderer artifact={makeArtifact()} />)
+    render(<ChartSpecV1Renderer artifact={makeArtifact()} />)
     fireEvent.click(screen.getAllByText('creation.infographics.exportPng')[0])
     // jsdom has no real canvas; export is a no-op rather than a throw
     expect(triggerBrowserDownload).not.toHaveBeenCalled()
   })
 
   it('shows an error for invalid artifact data', () => {
-    render(<ChartSpecRenderer artifact={makeArtifact({ data: { specs: 'not-an-array' } })} />)
+    render(<ChartSpecV1Renderer artifact={makeArtifact({ data: { specs: 'not-an-array' } })} />)
     expect(screen.getByText('creation.invalidArtifactData')).toBeDefined()
   })
 })

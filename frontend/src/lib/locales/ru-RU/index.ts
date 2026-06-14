@@ -548,6 +548,18 @@ export const ruRU = {
       exportSvg: "Экспорт SVG",
       renderError: "Не удалось отобразить диаграмму",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Экспорт Markdown",
+      exportPng: "Экспорт PNG",
+      exportSvg: "Экспорт SVG",
+      renderError: "Не удалось отобразить интеллект-карту",
+    },
   },
   podcasts: {
     generateEpisode: "Сгенерировать эпизод подкаста",

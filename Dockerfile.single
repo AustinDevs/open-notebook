@@ -62,6 +62,36 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# --- Quarto + Tectonic (textbook-creator renders HTML/PDF/EPUB) ----------------
+# Tectonic is a small, self-contained LaTeX engine used as Quarto's pdf-engine, so
+# we avoid a multi-GB TeX Live install. Quarto's latest tag is resolved at build
+# time; bump/pin TECTONIC_VERSION as needed.
+ARG TECTONIC_VERSION=0.16.9
+ENV TECTONIC_CACHE_DIR=/opt/tectonic-cache
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        amd64) quarto_arch='amd64'; tectonic_target='x86_64-unknown-linux-musl' ;; \
+        arm64) quarto_arch='arm64'; tectonic_target='aarch64-unknown-linux-musl' ;; \
+        *) echo "Unsupported arch: $arch"; exit 1 ;; \
+    esac; \
+    quarto_ver="$(curl -fsSL https://api.github.com/repos/quarto-dev/quarto-cli/releases/latest \
+        | grep -oE '"tag_name": *"v[^"]+"' | head -1 | sed -E 's/.*"v([^"]+)".*/\1/')"; \
+    mkdir -p /opt/quarto; \
+    curl -fsSL "https://github.com/quarto-dev/quarto-cli/releases/download/v${quarto_ver}/quarto-${quarto_ver}-linux-${quarto_arch}.tar.gz" \
+        | tar -xz -C /opt/quarto --strip-components=1; \
+    ln -sf /opt/quarto/bin/quarto /usr/local/bin/quarto; \
+    curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/tectonic-${TECTONIC_VERSION}-${tectonic_target}.tar.gz" \
+        | tar -xz -C /usr/local/bin tectonic; \
+    chmod +x /usr/local/bin/tectonic; \
+    quarto --version; tectonic --version
+# Pre-warm the tectonic package cache via a real Quarto PDF render so runtime PDF
+# generation works without network access.
+RUN set -eux; \
+    printf '---\ntitle: warmup\nformat:\n  pdf:\n    pdf-engine: tectonic\n---\n\n# Warmup\n\nInline math $E=mc^2$ and a list:\n\n- one\n- two\n' > /tmp/warm.qmd; \
+    quarto render /tmp/warm.qmd --to pdf; \
+    rm -rf /tmp/warm.qmd /tmp/warm.pdf /tmp/warm.tex /tmp/warm_files
+
 # Install SurrealDB (copied from pinned v2 image to match docker-compose.yml)
 COPY --from=surreal-binary /surreal /usr/local/bin/surreal
 

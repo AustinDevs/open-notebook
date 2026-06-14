@@ -548,6 +548,18 @@ export const enUS = {
       exportSvg: "Export SVG",
       renderError: "Failed to render chart",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Export Markdown",
+      exportPng: "Export PNG",
+      exportSvg: "Export SVG",
+      renderError: "Failed to render mindmap",
+    },
   },
   podcasts: {
     generateEpisode: "Generate Podcast Episode",

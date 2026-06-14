@@ -548,6 +548,18 @@ export const zhTW = {
       exportSvg: "匯出 SVG",
       renderError: "圖表轉譯失敗",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "匯出 Markdown",
+      exportPng: "匯出 PNG",
+      exportSvg: "匯出 SVG",
+      renderError: "心智圖轉譯失敗",
+    },
   },
   podcasts: {
     generateEpisode: "生成播客單集",

@@ -81,7 +81,7 @@ function exportCsv(deckName: string, cards: Card[]) {
   )
 }
 
-export function FlashcardsRenderer({ artifact }: { artifact: CreationArtifact }) {
+export function FlashcardsV1Renderer({ artifact }: { artifact: CreationArtifact }) {
   const { t } = useTranslation()
   const parsed = useMemo(() => FlashcardsV1Schema.safeParse(artifact.data), [artifact.data])
   const cards = useMemo(() => (parsed.success ? parsed.data.cards : []), [parsed])

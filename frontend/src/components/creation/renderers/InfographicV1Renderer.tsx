@@ -30,7 +30,7 @@ function lucideIcon(name?: string | null) {
   return typeof Comp === 'function' ? (Comp as React.ComponentType<{ className?: string }>) : null
 }
 
-export function InfographicRenderer({ artifact }: { artifact: CreationArtifact }) {
+export function InfographicV1Renderer({ artifact }: { artifact: CreationArtifact }) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
   const parsed = useMemo(() => InfographicV1Schema.safeParse(artifact.data), [artifact.data])

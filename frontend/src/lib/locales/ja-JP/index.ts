@@ -548,6 +548,18 @@ export const jaJP = {
       exportSvg: "SVGをエクスポート",
       renderError: "グラフの描画に失敗しました",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Markdownをエクスポート",
+      exportPng: "PNGをエクスポート",
+      exportSvg: "SVGをエクスポート",
+      renderError: "マインドマップの描画に失敗しました",
+    },
   },
   podcasts: {
     generateEpisode: "ポッドキャストエピソードを生成",

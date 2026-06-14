@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-import { InfographicRenderer } from './InfographicRenderer'
+import { InfographicV1Renderer } from './InfographicV1Renderer'
 import type { CreationArtifact } from '@/lib/types/creation'
 
 const { toPng, toSvg, triggerBrowserDownload } = vi.hoisted(() => ({
@@ -47,9 +47,9 @@ function makeArtifact(overrides: Partial<CreationArtifact> = {}): CreationArtifa
   }
 }
 
-describe('InfographicRenderer', () => {
+describe('InfographicV1Renderer', () => {
   it('renders title, subtitle and all block types', () => {
-    render(<InfographicRenderer artifact={makeArtifact()} />)
+    render(<InfographicV1Renderer artifact={makeArtifact()} />)
     expect(screen.getByText('Climate Snapshot')).toBeDefined()
     expect(screen.getByText('Key figures')).toBeDefined()
     expect(screen.getByText('1.5°C')).toBeDefined() // stat
@@ -59,13 +59,13 @@ describe('InfographicRenderer', () => {
   })
 
   it('offers PNG and SVG export', () => {
-    render(<InfographicRenderer artifact={makeArtifact()} />)
+    render(<InfographicV1Renderer artifact={makeArtifact()} />)
     expect(screen.getByText('creation.infographics.exportPng')).toBeDefined()
     expect(screen.getByText('creation.infographics.exportSvg')).toBeDefined()
   })
 
   it('exports PNG via html-to-image', async () => {
-    render(<InfographicRenderer artifact={makeArtifact()} />)
+    render(<InfographicV1Renderer artifact={makeArtifact()} />)
     fireEvent.click(screen.getByText('creation.infographics.exportPng'))
     await waitFor(() => expect(toPng).toHaveBeenCalled())
     await waitFor(() => expect(triggerBrowserDownload).toHaveBeenCalled())
@@ -73,7 +73,7 @@ describe('InfographicRenderer', () => {
   })
 
   it('shows an error for invalid data', () => {
-    render(<InfographicRenderer artifact={makeArtifact({ data: { nope: true } })} />)
+    render(<InfographicV1Renderer artifact={makeArtifact({ data: { nope: true } })} />)
     expect(screen.getByText('creation.invalidArtifactData')).toBeDefined()
   })
 })

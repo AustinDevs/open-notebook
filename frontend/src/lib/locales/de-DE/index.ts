@@ -551,6 +551,18 @@ export const deDE = {
       exportSvg: "SVG exportieren",
       renderError: "Diagramm konnte nicht gerendert werden",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Markdown exportieren",
+      exportPng: "PNG exportieren",
+      exportSvg: "SVG exportieren",
+      renderError: "Mindmap konnte nicht gerendert werden",
+    },
   },
   podcasts: {
     generateEpisode: "Podcast-Episode erzeugen",

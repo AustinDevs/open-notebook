@@ -548,6 +548,18 @@ export const zhCN = {
       exportSvg: "导出 SVG",
       renderError: "图表渲染失败",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "导出 Markdown",
+      exportPng: "导出 PNG",
+      exportSvg: "导出 SVG",
+      renderError: "思维导图渲染失败",
+    },
   },
   podcasts: {
     generateEpisode: "生成播客单集",

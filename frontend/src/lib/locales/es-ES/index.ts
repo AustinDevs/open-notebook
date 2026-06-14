@@ -548,6 +548,18 @@ export const esES = {
       exportSvg: "Exportar SVG",
       renderError: "Error al renderizar el gráfico",
     },
+    textbook: {
+      chapters: "Chapters",
+      openInNewTab: "Open in new tab",
+      loadingPreview: "Loading preview\u2026",
+      previewUnavailable: "Preview unavailable",
+    },
+    mindmap: {
+      exportMarkdown: "Exportar Markdown",
+      exportPng: "Exportar PNG",
+      exportSvg: "Exportar SVG",
+      renderError: "Error al renderizar el mapa mental",
+    },
   },
   podcasts: {
     generateEpisode: "Generar episodio de podcast",

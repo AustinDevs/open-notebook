@@ -4,9 +4,11 @@ import { ComponentType } from 'react'
 
 import { CreationArtifact } from '@/lib/types/creation'
 import { FallbackRenderer } from './FallbackRenderer'
-import { FlashcardsRenderer } from './FlashcardsRenderer'
-import { ChartSpecRenderer } from './ChartSpecRenderer'
-import { InfographicRenderer } from './InfographicRenderer'
+import { FlashcardsV1Renderer } from './FlashcardsV1Renderer'
+import { ChartSpecV1Renderer } from './ChartSpecV1Renderer'
+import { InfographicV1Renderer } from './InfographicV1Renderer'
+import { MindmapV1Renderer } from './MindmapV1Renderer'
+import { TextbookV1Renderer } from './TextbookV1Renderer'
 
 export type ArtifactRenderer = ComponentType<{ artifact: CreationArtifact }>
 
@@ -16,9 +18,11 @@ export type ArtifactRenderer = ComponentType<{ artifact: CreationArtifact }>
  * one new entry. Unknown ids fall back to a safe raw-JSON view.
  */
 export const artifactRenderers: Record<string, ArtifactRenderer> = {
-  'flashcards.v1': FlashcardsRenderer,
-  'chart_spec.v1': ChartSpecRenderer,
-  'infographic.v1': InfographicRenderer,
+  'flashcards.v1': FlashcardsV1Renderer,
+  'chart_spec.v1': ChartSpecV1Renderer,
+  'infographic.v1': InfographicV1Renderer,
+  'mindmap.v1': MindmapV1Renderer,
+  'textbook.v1': TextbookV1Renderer,
 }
 
 export function getRenderer(schemaId?: string | null): ArtifactRenderer {
