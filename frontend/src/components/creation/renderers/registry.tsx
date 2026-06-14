@@ -7,6 +7,7 @@ import { FallbackRenderer } from './FallbackRenderer'
 import { FlashcardsV1Renderer } from './FlashcardsV1Renderer'
 import { ChartSpecV1Renderer } from './ChartSpecV1Renderer'
 import { InfographicV1Renderer } from './InfographicV1Renderer'
+import { InfographicV2Renderer } from './InfographicV2Renderer'
 import { MindmapV1Renderer } from './MindmapV1Renderer'
 import { TextbookV1Renderer } from './TextbookV1Renderer'
 
@@ -21,6 +22,7 @@ export const artifactRenderers: Record<string, ArtifactRenderer> = {
   'flashcards.v1': FlashcardsV1Renderer,
   'chart_spec.v1': ChartSpecV1Renderer,
   'infographic.v1': InfographicV1Renderer,
+  'infographic.v2': InfographicV2Renderer,
   'mindmap.v1': MindmapV1Renderer,
   'textbook.v1': TextbookV1Renderer,
 }

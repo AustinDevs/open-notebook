@@ -68,6 +68,20 @@ export type InfographicV1 = {
 }>;
 };
 
+// === infographic.v2 ===
+export const InfographicV2Schema = z.object({
+  library: z.string().optional(),
+  title: z.string().nullable().optional(),
+  spec: z.string().optional(),
+  theme: z.string().nullable().optional(),
+});
+export type InfographicV2 = {
+  library?: string;
+  title?: (string | null);
+  spec?: string;
+  theme?: (string | null);
+};
+
 // === mindmap.v1 ===
 export const MindmapV1Schema = z.object({
   title: z.string(),
@@ -116,6 +130,7 @@ export const SCHEMA_VALIDATORS: Record<string, z.ZodTypeAny> = {
   "flashcards.v1": FlashcardsV1Schema,
   "chart_spec.v1": ChartSpecV1Schema,
   "infographic.v1": InfographicV1Schema,
+  "infographic.v2": InfographicV2Schema,
   "mindmap.v1": MindmapV1Schema,
   "audio.v1": AudioV1Schema,
   "textbook.v1": TextbookV1Schema,

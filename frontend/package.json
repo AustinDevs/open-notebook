@@ -19,6 +19,7 @@
   "dependencies": {
     "@antv/g-svg": "^2.1.1",
     "@antv/g2": "^5.4.8",
+    "@antv/infographic": "^0.2.19",
     "@hookform/resolvers": "^5.1.1",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-accordion": "^1.2.12",
