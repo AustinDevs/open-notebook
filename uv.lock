@@ -409,8 +409,8 @@ wheels = [
 
 [[package]]
 name = "chart-creator"
-version = "0.2.0"
-source = { git = "https://github.com/Notebooker-ai/chart-creator.git?branch=main#616db10796e78626cd9cf4961ad6724fd6f3aa55" }
+version = "0.2.1"
+source = { git = "https://github.com/Notebooker-ai/chart-creator.git?branch=main#42d02885049fd9bce332e17afb026800ebe2a1f4" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
@@ -1126,8 +1126,8 @@ wheels = [
 
 [[package]]
 name = "infographic-creator"
-version = "0.3.0"
-source = { git = "https://github.com/Notebooker-ai/infographic-creator.git?branch=main#ff057282a06583575c639ec93d0883e2927bb270" }
+version = "0.3.1"
+source = { git = "https://github.com/Notebooker-ai/infographic-creator.git?branch=main#91479cd628b058c5195f6d4935e575496ab0897b" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
@@ -1977,8 +1977,8 @@ wheels = [
 
 [[package]]
 name = "mindmap-creator"
-version = "0.1.0"
-source = { git = "https://github.com/Notebooker-ai/mindmap-creator.git?branch=main#a2b26fc8e57ccda0bce36556b0e93cfb8a5c1f90" }
+version = "0.1.1"
+source = { git = "https://github.com/Notebooker-ai/mindmap-creator.git?branch=main#e75d2cb5bf7896a03125f6720041383648eddf3b" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
