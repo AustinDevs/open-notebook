@@ -160,3 +160,31 @@ def get_creator(key: str) -> BaseCreator:
     if not lc.available:
         raise ValueError(f"Creator '{key}' is unavailable: {lc.error}")
     return lc.creator
+
+
+def get_view_asset(key: str) -> Optional[tuple[str, str]]:
+    """Locate a creator's static view bundle: ``(module_name, entry_relpath)``.
+
+    A creator opts into owning its own UI by declaring ``manifest.view`` — e.g.
+    ``view = {"entry": "view/index.html"}`` — and shipping that self-contained
+    HTML file inside its package. The host serves it (see the ``.../view``
+    endpoint) and injects the artifact data; the bundle renders by ``schema_id``,
+    so a newer plugin still displays artifacts created under older schema versions.
+
+    Read defensively via ``getattr`` so the host stays forward-compatible with
+    SDK versions that predate the ``view`` field. Returns ``None`` when the
+    creator is unavailable or declares no view.
+    """
+    lc = _REGISTRY.get(key)
+    if lc is None or not lc.available or lc.manifest is None:
+        return None
+    view = getattr(lc.manifest, "view", None)
+    if not view:
+        return None
+    entry = view.get("entry") if isinstance(view, dict) else getattr(view, "entry", None)
+    if not entry:
+        return None
+    module_name = CREATOR_PACKAGES.get(key, "").partition(":")[0]
+    if not module_name:
+        return None
+    return module_name, entry

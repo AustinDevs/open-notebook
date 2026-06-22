@@ -45,6 +45,16 @@ export const creationApi = {
     return response.data
   },
 
+  // Fetch a creator's self-contained HTML view bundle. Fetched (not iframe-src'd)
+  // so the auth header is sent; the caller object-URLs it into a sandboxed iframe.
+  getCreatorView: async (creatorKey: string): Promise<Blob> => {
+    const response = await apiClient.get<Blob>(
+      `/creation/creators/${creatorKey}/view`,
+      { responseType: 'blob' }
+    )
+    return response.data
+  },
+
   getReviewState: async (artifactId: string) => {
     const response = await apiClient.get<Record<string, Record<string, unknown>>>(
       `/creation/artifacts/${artifactId}/review`

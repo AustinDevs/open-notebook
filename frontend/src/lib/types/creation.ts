@@ -22,6 +22,9 @@ export interface CreatorManifest {
   config_schema: Record<string, unknown>
   icon?: string | null
   has_custom_form?: boolean
+  // True when the plugin ships its own self-contained HTML view bundle, served
+  // from `/creation/creators/{key}/view` and rendered by `PluginViewRenderer`.
+  has_view?: boolean
   available: boolean
   error?: string | null
 }

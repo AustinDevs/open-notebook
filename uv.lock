@@ -409,8 +409,8 @@ wheels = [
 
 [[package]]
 name = "chart-creator"
-version = "0.2.1"
-source = { git = "https://github.com/Notebooker-ai/chart-creator.git?branch=main#42d02885049fd9bce332e17afb026800ebe2a1f4" }
+version = "0.3.0"
+source = { git = "https://github.com/Notebooker-ai/chart-creator.git?branch=main#7743e24555289687a57304ac5427433384e2d00c" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
@@ -808,8 +808,8 @@ wheels = [
 
 [[package]]
 name = "flashcard-creator"
-version = "0.1.1"
-source = { git = "https://github.com/Notebooker-ai/flashcard-creator.git?branch=main#06d2f17f028b71c81abdff72cc21337bebf480e0" }
+version = "0.2.0"
+source = { git = "https://github.com/Notebooker-ai/flashcard-creator.git?branch=main#3acfb5e1413458c1a2d93358e038ece64fbe9626" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
@@ -1126,8 +1126,8 @@ wheels = [
 
 [[package]]
 name = "infographic-creator"
-version = "0.3.1"
-source = { git = "https://github.com/Notebooker-ai/infographic-creator.git?branch=main#91479cd628b058c5195f6d4935e575496ab0897b" }
+version = "0.4.0"
+source = { git = "https://github.com/Notebooker-ai/infographic-creator.git?branch=main#c8bf6a4bfc441bcb785d0265ab9d025320a9982a" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
@@ -1980,8 +1980,8 @@ wheels = [
 
 [[package]]
 name = "mindmap-creator"
-version = "0.1.1"
-source = { git = "https://github.com/Notebooker-ai/mindmap-creator.git?branch=main#e75d2cb5bf7896a03125f6720041383648eddf3b" }
+version = "0.2.0"
+source = { git = "https://github.com/Notebooker-ai/mindmap-creator.git?branch=main#82391997bd519c3f63dacc94c811ea524b644d87" }
 dependencies = [
     { name = "ai-prompter" },
     { name = "esperanto" },
@@ -2298,8 +2298,8 @@ dev = [
 
 [[package]]
 name = "open-notebook-creator-sdk"
-version = "0.3.0"
-source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#761a537bfdf520ffd02c98249517f12b76876c76" }
+version = "0.4.0"
+source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#8cdc5bab40b534cef3468e911fe5e16577e2d9a8" }
 dependencies = [
     { name = "packaging" },
     { name = "pydantic" },

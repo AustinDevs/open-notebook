@@ -6,9 +6,10 @@ import { Loader2, Trash2, AlertTriangle, ChevronDown, ChevronRight } from 'lucid
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useTranslation } from '@/lib/hooks/use-translation'
-import { useDeleteCreationArtifact } from '@/lib/hooks/use-creation'
+import { useCreators, useDeleteCreationArtifact } from '@/lib/hooks/use-creation'
 import { CreationArtifact } from '@/lib/types/creation'
 import { getRenderer } from './renderers/registry'
+import { PluginViewRenderer } from './renderers/PluginViewRenderer'
 
 const STATUS_VARIANT: Record<string, string> = {
   completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -35,6 +36,14 @@ interface Props {
 export function CreationArtifactCard({ artifact, notebookId }: Props) {
   const { t } = useTranslation()
   const del = useDeleteCreationArtifact(artifact.creator_key, notebookId)
+  // Prefer the plugin's own view: a shipped bundle (`has_view`) or a self-contained
+  // HTML file the plugin emitted. Otherwise fall back to a core schema renderer.
+  const { creators } = useCreators()
+  const hasViewBundle = creators.find(c => c.key === artifact.creator_key)?.has_view
+  const hasHtmlFile = (artifact.files ?? []).some(
+    f => f.content_type === 'text/html' || f.filename.toLowerCase().endsWith('.html')
+  )
+  const usePluginView = Boolean(hasViewBundle) || hasHtmlFile
   const Renderer = getRenderer(artifact.schema_id)
   const isActive = artifact.status === 'running' || artifact.status === 'submitted'
   const isDone = artifact.status === 'completed' || artifact.status === 'partial'
@@ -98,7 +107,13 @@ export function CreationArtifactCard({ artifact, notebookId }: Props) {
         </p>
       )}
 
-      {isDone && expanded && <Renderer artifact={artifact} />}
+      {isDone &&
+        expanded &&
+        (usePluginView ? (
+          <PluginViewRenderer artifact={artifact} hasViewBundle={hasViewBundle} />
+        ) : (
+          <Renderer artifact={artifact} />
+        ))}
     </div>
   )
 }

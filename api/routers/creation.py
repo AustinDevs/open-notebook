@@ -6,17 +6,19 @@ download files, delete, and read/write flashcard review state.
 
 from __future__ import annotations
 
+import mimetypes
+from importlib import resources
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from loguru import logger
 from pydantic import BaseModel
 from surreal_commands import get_command_status
 
 from open_notebook.config import DATA_FOLDER
-from open_notebook.creation.registry import all_loaded, registry_digest
+from open_notebook.creation.registry import all_loaded, get_view_asset, registry_digest
 from open_notebook.domain.creation_artifact import CreationArtifact, FlashcardReview
 
 router = APIRouter()
@@ -67,12 +69,46 @@ async def list_creators():
                     "config_schema": m.config_schema,
                     "icon": m.icon,
                     "has_custom_form": m.has_custom_form,
+                    "has_view": get_view_asset(key) is not None,
                     "available": True,
                 }
             )
         else:
             out.append({"key": key, "available": False, "error": lc.error})
     return {"creators": out, "registry_digest": registry_digest()}
+
+
+@router.get("/creation/creators/{key}/view")
+async def get_creator_view(key: str):
+    """Serve a creator's self-contained HTML view bundle (its own UI).
+
+    The frontend fetches this with auth, object-URLs it into a sandboxed iframe,
+    and posts the artifact ``{schema_id, data}`` in. The bundle ships inside the
+    plugin package and owns version dispatch, so the view lives with the plugin
+    rather than in the core frontend. 404 when the creator declares no view.
+    """
+    asset = get_view_asset(key)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Creator has no view")
+    module_name, entry = asset
+    # entry is plugin-authored; refuse absolute paths / parent traversal anyway.
+    if entry.startswith("/") or ".." in Path(entry).parts:
+        raise HTTPException(status_code=404, detail="Invalid view entry")
+    try:
+        target = resources.files(module_name).joinpath(entry)
+        if not target.is_file():
+            raise HTTPException(status_code=404, detail="View asset not found")
+        data = target.read_bytes()
+    except ModuleNotFoundError:
+        raise HTTPException(status_code=404, detail="Creator module not found")
+    media_type = mimetypes.guess_type(entry)[0] or "text/html"
+    # The bundle is static for an installed plugin version (and can be 1-2 MB with
+    # vendored libs); let the browser cache it across the many card re-expands.
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=600"},
+    )
 
 
 # --- generation --------------------------------------------------------------
