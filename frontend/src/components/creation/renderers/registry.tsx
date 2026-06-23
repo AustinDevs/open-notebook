@@ -4,27 +4,17 @@ import { ComponentType } from 'react'
 
 import { CreationArtifact } from '@/lib/types/creation'
 import { FallbackRenderer } from './FallbackRenderer'
-import { FlashcardsV1Renderer } from './FlashcardsV1Renderer'
-import { ChartSpecV1Renderer } from './ChartSpecV1Renderer'
-import { InfographicV1Renderer } from './InfographicV1Renderer'
-import { InfographicV2Renderer } from './InfographicV2Renderer'
-import { MindmapV1Renderer } from './MindmapV1Renderer'
 
 export type ArtifactRenderer = ComponentType<{ artifact: CreationArtifact }>
 
 /**
- * Maps a versioned artifact `schema_id` to its core React renderer. This is the
- * legacy/fallback path: creators that ship their own view bundle (or emit a
- * self-contained HTML file, like textbook) are rendered by `PluginViewRenderer`
- * instead and need no entry here. Unknown ids fall back to a raw-JSON view.
+ * Core schema renderers used to live here, but every creator now owns its UI —
+ * either a self-contained view bundle (`has_view`) or an emitted HTML file — both
+ * rendered by {@link PluginViewRenderer}. This registry is only the safety net for
+ * an artifact that has neither: it renders a raw-JSON {@link FallbackRenderer}. Add
+ * an entry here only if you ever need a host-side renderer for a bundle-less schema.
  */
-export const artifactRenderers: Record<string, ArtifactRenderer> = {
-  'flashcards.v1': FlashcardsV1Renderer,
-  'chart_spec.v1': ChartSpecV1Renderer,
-  'infographic.v1': InfographicV1Renderer,
-  'infographic.v2': InfographicV2Renderer,
-  'mindmap.v1': MindmapV1Renderer,
-}
+export const artifactRenderers: Record<string, ArtifactRenderer> = {}
 
 export function getRenderer(schemaId?: string | null): ArtifactRenderer {
   if (schemaId && artifactRenderers[schemaId]) return artifactRenderers[schemaId]

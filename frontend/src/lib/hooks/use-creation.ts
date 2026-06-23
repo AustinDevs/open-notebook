@@ -97,21 +97,3 @@ export function useDeleteCreationArtifact(creatorKey?: string, notebookId?: stri
     },
   })
 }
-
-export function useFlashcardReview(artifactId: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.creationReview(artifactId),
-    queryFn: () => creationApi.getReviewState(artifactId),
-  })
-}
-
-export function useSaveFlashcardReview(artifactId: string) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (states: Record<string, Record<string, unknown>>) =>
-      creationApi.saveReviewState(artifactId, states),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.creationReview(artifactId) })
-    },
-  })
-}

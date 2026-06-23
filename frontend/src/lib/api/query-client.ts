@@ -36,6 +36,4 @@ export const QUERY_KEYS = {
   creationArtifacts: (creatorKey?: string, notebookId?: string) =>
     ['creation', 'artifacts', creatorKey, notebookId] as const,
   creationArtifact: (id: string) => ['creation', 'artifacts', id] as const,
-  creationReview: (artifactId: string) =>
-    ['creation', 'artifacts', artifactId, 'review'] as const,
 }

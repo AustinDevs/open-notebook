@@ -55,20 +55,6 @@ export const creationApi = {
     return response.data
   },
 
-  getReviewState: async (artifactId: string) => {
-    const response = await apiClient.get<Record<string, Record<string, unknown>>>(
-      `/creation/artifacts/${artifactId}/review`
-    )
-    return response.data
-  },
-
-  saveReviewState: async (
-    artifactId: string,
-    states: Record<string, Record<string, unknown>>
-  ) => {
-    await apiClient.put(`/creation/artifacts/${artifactId}/review`, { states })
-  },
-
   // Reuse the generic surreal-commands job poller.
   waitForCommand: insightsApi.waitForCommand,
 }
