@@ -8,11 +8,13 @@ from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel
 
 
-async def _resolve_model_config(model_id: str) -> Tuple[str, str, dict]:
+async def _resolve_model_config(
+    model_id: str, max_tokens: Optional[int] = None
+) -> Tuple[str, str, dict]:
     """Load Model record, resolve credential -> (provider, model_name, config_dict).
 
     Used by resolve_outline_config, resolve_transcript_config, resolve_tts_config,
-    and per-speaker TTS overrides.
+    and per-speaker TTS overrides. Optionally passes through a max_tokens override.
     """
     from open_notebook.ai.models import Model
 
@@ -26,6 +28,8 @@ async def _resolve_model_config(model_id: str) -> Tuple[str, str, dict]:
         from open_notebook.ai.key_provider import provision_provider_keys
 
         await provision_provider_keys(model.provider)
+    if max_tokens is not None:
+        config = {**config, "max_tokens": max_tokens}
     return (model.provider, model.name, config)
 
 
@@ -45,6 +49,7 @@ class EpisodeProfile(ObjectModel):
         "outline_llm",
         "transcript_llm",
         "language",
+        "max_tokens",
     }
 
     name: str = Field(..., description="Unique profile name")
@@ -78,6 +83,10 @@ class EpisodeProfile(ObjectModel):
 
     default_briefing: str = Field(..., description="Default briefing template")
     num_segments: int = Field(default=5, description="Number of podcast segments")
+    max_tokens: Optional[int] = Field(
+        None,
+        description="Max output tokens for outline/transcript generation (passed through to podcast_creator)",
+    )
 
     @field_validator("num_segments")
     @classmethod
@@ -101,7 +110,7 @@ class EpisodeProfile(ObjectModel):
                 f"Episode profile '{self.name}' has no outline model configured. "
                 "Please update the profile to select an outline model."
             )
-        return await _resolve_model_config(self.outline_llm)
+        return await _resolve_model_config(self.outline_llm, max_tokens=self.max_tokens)
 
     async def resolve_transcript_config(self) -> Tuple[str, str, dict]:
         """Resolve transcript model -> (provider, model_name, config_dict)"""
@@ -110,7 +119,9 @@ class EpisodeProfile(ObjectModel):
                 f"Episode profile '{self.name}' has no transcript model configured. "
                 "Please update the profile to select a transcript model."
             )
-        return await _resolve_model_config(self.transcript_llm)
+        return await _resolve_model_config(
+            self.transcript_llm, max_tokens=self.max_tokens
+        )
 
     @classmethod
     async def get_by_name(cls, name: str) -> Optional["EpisodeProfile"]:
@@ -258,6 +269,46 @@ class PodcastEpisode(ObjectModel):
             }
         except Exception:
             return {"status": "unknown", "error_message": None}
+
+    @classmethod
+    async def get_job_details_for_commands(
+        cls, command_ids: List[Union[str, RecordID]]
+    ) -> Dict[str, dict]:
+        """
+        Batch-fetch {status, error_message} for many commands in one query.
+
+        Listing episodes otherwise calls get_job_detail() -> surreal_commands
+        .get_command_status() once per episode, each its own round trip
+        against the `command` table (no connection pooling in the repository
+        layer, see docs/7-DEVELOPMENT/architecture.md) - O(n) queries for n
+        episodes. surreal_commands has no batch lookup, but its command table
+        lives in the same database (same SURREAL_* env vars), so this queries
+        it directly in one shot instead of looping through the library's
+        per-command helper.
+
+        CommandStatus is a `str` subclass (`class CommandStatus(str, Enum)`),
+        so returning the raw DB string here is interchangeable with the
+        enum-wrapped value get_job_detail() returns for every comparison
+        this codebase does against it.
+        """
+        ids = [cid for cid in command_ids if cid]
+        grouped: Dict[str, dict] = {}
+        if not ids:
+            return grouped
+        try:
+            result = await repo_query(
+                "SELECT * FROM command WHERE id IN $command_ids",
+                {"command_ids": [ensure_record_id(cid) for cid in ids]},
+            )
+        except Exception as e:
+            logger.error(f"Error batch-fetching command status: {e}")
+            return grouped
+        for row in result:
+            grouped[str(row.get("id"))] = {
+                "status": row.get("status", "unknown"),
+                "error_message": row.get("error_message"),
+            }
+        return grouped
 
     @field_validator("command", mode="before")
     @classmethod

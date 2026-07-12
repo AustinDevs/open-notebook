@@ -18,7 +18,13 @@ from api.podcast_service import PodcastService
 from open_notebook.ai.models import ModelManager
 from open_notebook.domain.base import RecordModel
 from open_notebook.domain.content_settings import ContentSettings
-from open_notebook.domain.notebook import Asset, Note, Notebook, Source
+from open_notebook.domain.notebook import (
+    Asset,
+    Note,
+    Notebook,
+    Source,
+    SourceInsight,
+)
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import InvalidInputError
 from open_notebook.podcasts.models import EpisodeProfile, SpeakerProfile
@@ -127,13 +133,15 @@ class TestNotebookDomain:
         async def fake_get_notes(self, include_content=False):
             return []
 
-        async def fake_get_insights(self):
-            return []
+        async def fake_get_for_sources(cls, source_ids):
+            return {sid: [] for sid in source_ids}
 
         with (
             patch.object(Notebook, "get_sources", new=fake_get_sources),
             patch.object(Notebook, "get_notes", new=fake_get_notes),
-            patch.object(Source, "get_insights", new=fake_get_insights),
+            patch.object(
+                SourceInsight, "get_for_sources", new=classmethod(fake_get_for_sources)
+            ),
         ):
             context = await notebook.get_context()
 
@@ -203,12 +211,18 @@ class TestNotebookDomain:
         async def fake_get_notes(self, include_content=False):
             return []
 
-        async def fake_get_context(self, context_size="short"):
+        async def fake_get_for_sources(cls, source_ids):
+            return {sid: [] for sid in source_ids}
+
+        async def fake_get_context(self, context_size="short", insights=None):
             raise RuntimeError("source context failed")
 
         with (
             patch.object(Notebook, "get_sources", new=fake_get_sources),
             patch.object(Notebook, "get_notes", new=fake_get_notes),
+            patch.object(
+                SourceInsight, "get_for_sources", new=classmethod(fake_get_for_sources)
+            ),
             patch.object(Source, "get_context", new=fake_get_context),
         ):
             with pytest.raises(RuntimeError, match="source context failed"):
@@ -477,8 +491,8 @@ class TestPodcastService:
         async def fake_get_notes(self, include_content=False):
             return []
 
-        async def fake_get_insights(self):
-            return []
+        async def fake_get_for_sources(cls, source_ids):
+            return {sid: [] for sid in source_ids}
 
         def fake_submit_command(app_name, command_name, command_args):
             submitted_args.update(command_args)
@@ -489,7 +503,8 @@ class TestPodcastService:
         # generate_podcast_command` when the package is imported, so the fake
         # submodule must expose that name or the package import fails before the
         # patched submit_command is reached.
-        fake_commands_module.generate_podcast_command = lambda *a, **k: None
+        # setattr: dynamic module attribute mypy can't know about
+        setattr(fake_commands_module, "generate_podcast_command", lambda *a, **k: None)
 
         with (
             patch.object(
@@ -501,7 +516,9 @@ class TestPodcastService:
             patch.object(Notebook, "get", new=AsyncMock(return_value=notebook)),
             patch.object(Notebook, "get_sources", new=fake_get_sources),
             patch.object(Notebook, "get_notes", new=fake_get_notes),
-            patch.object(Source, "get_insights", new=fake_get_insights),
+            patch.object(
+                SourceInsight, "get_for_sources", new=classmethod(fake_get_for_sources)
+            ),
             patch("api.podcast_service.submit_command", new=fake_submit_command),
             patch.dict(
                 sys.modules, {"commands.podcast_commands": fake_commands_module}
@@ -559,6 +576,7 @@ class TestContentSettings:
         assert settings.default_content_processing_engine_doc == "auto"
         assert settings.default_embedding_option == "ask"
         assert settings.auto_delete_files == "yes"
+        assert settings.youtube_preferred_languages is not None
         assert len(settings.youtube_preferred_languages) > 0
 
 

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from open_notebook.exceptions import OpenNotebookError
 from open_notebook.podcasts.models import EpisodeProfile
 
 router = APIRouter()
@@ -19,6 +20,7 @@ class EpisodeProfileResponse(BaseModel):
     language: Optional[str] = None
     default_briefing: str
     num_segments: int
+    max_tokens: Optional[int] = None
     # Legacy fields (for display/migration awareness)
     outline_provider: Optional[str] = None
     outline_model: Optional[str] = None
@@ -37,6 +39,7 @@ def _profile_to_response(profile: EpisodeProfile) -> EpisodeProfileResponse:
         language=profile.language,
         default_briefing=profile.default_briefing,
         num_segments=profile.num_segments,
+        max_tokens=profile.max_tokens,
         outline_provider=profile.outline_provider,
         outline_model=profile.outline_model,
         transcript_provider=profile.transcript_provider,
@@ -50,6 +53,10 @@ async def list_episode_profiles():
     try:
         profiles = await EpisodeProfile.get_all(order_by="name asc")
         return [_profile_to_response(p) for p in profiles]
+    except HTTPException:
+        raise
+    except OpenNotebookError:
+        raise
     except Exception as e:
         logger.error(f"Failed to fetch episode profiles: {e}")
         raise HTTPException(
@@ -72,6 +79,8 @@ async def get_episode_profile(profile_name: str):
 
     except HTTPException:
         raise
+    except OpenNotebookError:
+        raise
     except Exception as e:
         logger.error(f"Failed to fetch episode profile '{profile_name}': {e}")
         raise HTTPException(
@@ -90,6 +99,10 @@ class EpisodeProfileCreate(BaseModel):
     language: Optional[str] = Field(None, description="Podcast language code")
     default_briefing: str = Field(..., description="Default briefing template")
     num_segments: int = Field(default=5, description="Number of podcast segments")
+    max_tokens: Optional[int] = Field(
+        None,
+        description="Max output tokens for outline/transcript generation",
+    )
     # Legacy fields (accepted but not required)
     outline_provider: Optional[str] = None
     outline_model: Optional[str] = None
@@ -110,6 +123,7 @@ async def create_episode_profile(profile_data: EpisodeProfileCreate):
             language=profile_data.language,
             default_briefing=profile_data.default_briefing,
             num_segments=profile_data.num_segments,
+            max_tokens=profile_data.max_tokens,
             outline_provider=profile_data.outline_provider,
             outline_model=profile_data.outline_model,
             transcript_provider=profile_data.transcript_provider,
@@ -119,6 +133,10 @@ async def create_episode_profile(profile_data: EpisodeProfileCreate):
         await profile.save()
         return _profile_to_response(profile)
 
+    except HTTPException:
+        raise
+    except OpenNotebookError:
+        raise
     except Exception as e:
         logger.error(f"Failed to create episode profile: {e}")
         raise HTTPException(
@@ -145,6 +163,8 @@ async def update_episode_profile(profile_id: str, profile_data: EpisodeProfileCr
 
     except HTTPException:
         raise
+    except OpenNotebookError:
+        raise
     except Exception as e:
         logger.error(f"Failed to update episode profile: {e}")
         raise HTTPException(
@@ -168,6 +188,8 @@ async def delete_episode_profile(profile_id: str):
         return {"message": "Episode profile deleted successfully"}
 
     except HTTPException:
+        raise
+    except OpenNotebookError:
         raise
     except Exception as e:
         logger.error(f"Failed to delete episode profile: {e}")
@@ -198,6 +220,7 @@ async def duplicate_episode_profile(profile_id: str):
             language=original.language,
             default_briefing=original.default_briefing,
             num_segments=original.num_segments,
+            max_tokens=original.max_tokens,
             outline_provider=original.outline_provider,
             outline_model=original.outline_model,
             transcript_provider=original.transcript_provider,
@@ -208,6 +231,8 @@ async def duplicate_episode_profile(profile_id: str):
         return _profile_to_response(duplicate)
 
     except HTTPException:
+        raise
+    except OpenNotebookError:
         raise
     except Exception as e:
         logger.error(f"Failed to duplicate episode profile: {e}")

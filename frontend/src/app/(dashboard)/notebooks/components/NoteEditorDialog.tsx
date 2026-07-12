@@ -120,13 +120,13 @@ export function NoteEditorDialog({ open, onOpenChange, notebookId, note }: NoteE
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className={cn(
-          "sm:max-w-3xl w-full max-h-[90vh] overflow-hidden p-0",
+          "sm:max-w-3xl w-full h-[90vh] max-h-[90vh] overflow-hidden p-0 flex flex-col",
           isEditorFullscreen && "!max-w-screen !max-h-screen border-none w-screen h-screen"
       )}>
         <DialogTitle className="sr-only">
           {isEditing ? t('sources.editNote') : t('sources.createNote')}
         </DialogTitle>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex h-full flex-col min-w-0">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 min-h-0 flex-col min-w-0">
           {isEditing && noteLoading ? (
             <div className="flex-1 flex items-center justify-center py-10">
               <span className="text-sm text-muted-foreground">{t('common.loading')}</span>
@@ -147,7 +147,7 @@ export function NoteEditorDialog({ open, onOpenChange, notebookId, note }: NoteE
               </div>
 
               <div className={cn(
-                  "flex-1 overflow-y-auto",
+                  "flex-1 min-h-0 overflow-y-auto",
                   !isEditorFullscreen && "px-6 py-4")
               }>
                 <Controller
@@ -162,7 +162,7 @@ export function NoteEditorDialog({ open, onOpenChange, notebookId, note }: NoteE
                       height={420}
                       placeholder={t('sources.writeNotePlaceholder')}
                       className={cn(
-                          "w-full h-full min-h-[420px] max-h-[500px] overflow-hidden [&_.w-md-editor]:!static [&_.w-md-editor]:!w-full [&_.w-md-editor]:!h-full [&_.w-md-editor-content]:overflow-y-auto",
+                          "w-full h-full min-h-[420px] overflow-hidden [&_.w-md-editor]:!static [&_.w-md-editor]:!w-full [&_.w-md-editor]:!h-full [&_.w-md-editor-content]:overflow-y-auto",
                           !isEditorFullscreen && "rounded-md border"
                       )}
                     />
