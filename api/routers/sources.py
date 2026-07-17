@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from typing import Any, List, Optional
 
+from content_core import check_file_support
 from fastapi import (
     APIRouter,
     Depends,
@@ -39,9 +40,49 @@ from open_notebook.exceptions import (
     InvalidInputError,
     NotFoundError,
     OpenNotebookError,
+    UnsupportedTypeException,
 )
 
 router = APIRouter()
+
+
+async def _assert_file_supported(file_path: str) -> None:
+    """Pre-flight check that content-core can actually extract this file.
+
+    Rejects unsupported uploads at ingestion time (HTTP 415) instead of letting
+    them enqueue a background job that fails and then burns the full retry
+    budget before surfacing a generic error (#975). Uses content-core's
+    header-only routing, which is the same logic real extraction uses, so the
+    verdict can't disagree with what would happen downstream.
+
+    Unexpected errors (e.g. the file no longer exists on a retry) are swallowed
+    so this never turns a transient problem into a hard rejection — real
+    extraction will surface those.
+    """
+    try:
+        support = await check_file_support(file_path)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.debug(f"Pre-flight file-support check skipped for {file_path}: {e}")
+        return
+
+    if not support.supported:
+        detail = support.reason or "Unsupported file type"
+        if support.identified_type:
+            detail = f"{detail} (detected type: {support.identified_type})"
+        raise UnsupportedTypeException(detail)
+
+
+def _truncate_error(msg: Optional[str], limit: int = 200) -> Optional[str]:
+    """Cap error text surfaced to clients.
+
+    Command/processing failures can carry arbitrary internal exception text;
+    return at most ``limit`` characters so a raw traceback message can't leak
+    to the API response. ``None`` passes through unchanged.
+    """
+    if not msg:
+        return msg
+    return msg if len(msg) <= limit else msg[:limit] + "…"
+
 
 SOURCE_SORT_FIELDS = {
     "created": "created",
@@ -298,7 +339,7 @@ async def get_sources(
                 processing_info = {
                     "started_at": execution_metadata.get("started_at"),
                     "completed_at": execution_metadata.get("completed_at"),
-                    "error": command.get("error_message"),
+                    "error": _truncate_error(command.get("error_message")),
                 }
             elif command:
                 # Command exists but FETCH failed to resolve it (broken reference)
@@ -416,6 +457,8 @@ async def _build_content_state(
                 status_code=400,
                 detail="Invalid file path: must be within the uploads directory",
             )
+        # Reject unsupported files before enqueueing a doomed background job.
+        await _assert_file_supported(final_file_path)
         content_state["file_path"] = final_file_path
         content_state["delete_source"] = source_data.delete_source
     elif source_data.type == "text":
@@ -573,7 +616,7 @@ async def _create_source_sync_path(
                 pass
             raise HTTPException(
                 status_code=500,
-                detail=f"Processing failed: {result.error_message}",
+                detail=f"Processing failed: {_truncate_error(result.error_message)}",
             )
 
         # Get the processed source
@@ -931,6 +974,8 @@ async def retry_source_processing(source_id: str):
         content_state = {}
         if source.asset:
             if source.asset.file_path:
+                # Don't re-queue a retry for a file content-core can't extract.
+                await _assert_file_supported(source.asset.file_path)
                 content_state = {
                     "file_path": source.asset.file_path,
                     "delete_source": False,  # Don't delete on retry
