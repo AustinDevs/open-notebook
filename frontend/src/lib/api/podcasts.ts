@@ -38,6 +38,21 @@ export const podcastsApi = {
     return response.data
   },
 
+  askQuestion: async (
+    episodeId: string,
+    request: {
+      audio_base64: string
+      current_time: number
+      total_duration: number
+    }
+  ) => {
+    const response = await apiClient.post<InteractivePodcastResponse>(
+      `/podcasts/episodes/${episodeId}/ask`,
+      request
+    )
+    return response.data
+  },
+
   deleteEpisode: async (episodeId: string) => {
     await apiClient.delete(`/podcasts/episodes/${episodeId}`)
   },

@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { getDateLocale } from '@/lib/utils/date-locale'
 import { InfoIcon, RefreshCcw, Trash2 } from 'lucide-react'
 
+import apiClient from '@/lib/api/client'
 import { resolvePodcastAssetUrl } from '@/lib/api/podcasts'
 import { EpisodeStatus, FAILED_EPISODE_STATUSES, PodcastEpisode } from '@/lib/types/podcasts'
 import { cn } from '@/lib/utils'
@@ -19,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { InteractivePodcastPlayer } from '@/components/podcasts/InteractivePodcastPlayer'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -128,6 +130,20 @@ function extractOutlineSegments(outline: unknown): OutlineSegment[] {
   return []
 }
 
+/**
+ * "provider / name" label for a snapshot model row. Prefers the display
+ * fields the API resolves from the snapshot's model references, falls back
+ * to the legacy snapshot strings (pre-#1107 episodes), then to a dash.
+ */
+function formatModelLabel(
+  provider?: string | null,
+  name?: string | null,
+  legacyProvider?: string | null,
+  legacyName?: string | null
+): string {
+  return `${provider || legacyProvider || '—'} / ${name || legacyName || '—'}`
+}
+
 function extractTranscriptEntries(transcript: unknown): TranscriptEntry[] {
   if (transcript && typeof transcript === 'object' && 'transcript' in transcript) {
     const data = transcript as TranscriptData
@@ -162,31 +178,13 @@ export function EpisodeCard({ episode, onDelete, deleting, onRetry, retrying }: 
       }
 
       try {
-        let token: string | undefined
-        if (typeof window !== 'undefined') {
-          const raw = window.localStorage.getItem('auth-storage')
-          if (raw) {
-            try {
-              const parsed = JSON.parse(raw)
-              token = parsed?.state?.token
-            } catch (error) {
-              console.error('Failed to parse auth storage', error)
-            }
-          }
-        }
+        // apiClient attaches the auth header; directAudioUrl is absolute so
+        // the dynamic baseURL is ignored.
+        const response = await apiClient.get<Blob>(directAudioUrl, {
+          responseType: 'blob',
+        })
 
-        const headers: HeadersInit = {}
-        if (token) {
-          headers.Authorization = `Bearer ${token}`
-        }
-
-        const response = await fetch(directAudioUrl, { headers })
-        if (!response.ok) {
-          throw new Error(`Audio request failed with status ${response.status}`)
-        }
-
-        const blob = await response.blob()
-        revokeUrl = URL.createObjectURL(blob)
+        revokeUrl = URL.createObjectURL(response.data)
         setAudioSrc(revokeUrl)
       } catch (error) {
         console.error('Unable to load podcast audio', error)
@@ -212,7 +210,7 @@ export function EpisodeCard({ episode, onDelete, deleting, onRetry, retrying }: 
     : null
 
   const createdLabel = distance
-    ? t('podcasts.created').replace('{time}', distance)
+    ? t('podcasts.created', { time: distance })
     : null
 
   const handleDelete = () => {
@@ -281,22 +279,32 @@ export function EpisodeCard({ episode, onDelete, deleting, onRetry, retrying }: 
                               <div>
                                 <p className="text-muted-foreground">{t('podcasts.outlineModel')}</p>
                                 <p>
-                                  {episode.episode_profile?.outline_provider ?? '—'} /
-                                  {' '}
-                                  {episode.episode_profile?.outline_model ?? '—'}
+                                  {formatModelLabel(
+                                    episode.episode_profile?.outline_model_provider,
+                                    episode.episode_profile?.outline_model_name,
+                                    episode.episode_profile?.outline_provider,
+                                    episode.episode_profile?.outline_model
+                                  )}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">{t('podcasts.transcriptModel')}</p>
                                 <p>
-                                  {episode.episode_profile?.transcript_provider ?? '—'} /
-                                  {' '}
-                                  {episode.episode_profile?.transcript_model ?? '—'}
+                                  {formatModelLabel(
+                                    episode.episode_profile?.transcript_model_provider,
+                                    episode.episode_profile?.transcript_model_name,
+                                    episode.episode_profile?.transcript_provider,
+                                    episode.episode_profile?.transcript_model
+                                  )}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">{t('podcasts.segments')}</p>
                                 <p>{episode.episode_profile?.num_segments ?? '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">{t('podcasts.maxTokens')}</p>
+                                <p>{episode.episode_profile?.max_tokens ?? '—'}</p>
                               </div>
                             </div>
                             {episode.episode_profile?.default_briefing ? (
@@ -309,8 +317,12 @@ export function EpisodeCard({ episode, onDelete, deleting, onRetry, retrying }: 
                           <section className="space-y-2">
                             <h4 className="text-sm font-semibold text-foreground">{t('podcasts.speakerProfile')}</h4>
                             <p className="text-xs text-muted-foreground">
-                              {episode.speaker_profile?.tts_provider ?? '—'} /{' '}
-                              {episode.speaker_profile?.tts_model ?? '—'}
+                              {formatModelLabel(
+                                episode.speaker_profile?.voice_model_provider,
+                                episode.speaker_profile?.voice_model_name,
+                                episode.speaker_profile?.tts_provider,
+                                episode.speaker_profile?.tts_model
+                              )}
                             </p>
                             {episode.speaker_profile?.speakers?.map((speaker, index) => (
                               <div
@@ -403,7 +415,7 @@ export function EpisodeCard({ episode, onDelete, deleting, onRetry, retrying }: 
                 <AlertDialogHeader>
                   <AlertDialogTitle>{t('podcasts.deleteEpisodeTitle')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    {t('podcasts.deleteEpisodeDesc').replace('{name}', episode.name)}
+                    {t('podcasts.deleteEpisodeDesc', { name: episode.name })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

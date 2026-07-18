@@ -6,10 +6,11 @@ Provides endpoints for:
 - Getting contextual answers based on transcript position
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
-from typing import Optional
 
 from api.interactive_podcast_service import (
     InteractivePodcastService,

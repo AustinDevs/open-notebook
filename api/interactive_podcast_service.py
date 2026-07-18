@@ -18,7 +18,7 @@ from fastapi import HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
-from open_notebook.ai.models import Model, ModelManager
+from open_notebook.ai.models import ModelManager
 from open_notebook.podcasts.models import PodcastEpisode
 
 

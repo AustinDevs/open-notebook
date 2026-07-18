@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useInteractivePodcast } from '@/lib/hooks/use-interactive-podcast'
-import { useTranslation } from '@/lib/hooks/use-translation'
+import { useTranslation } from 'react-i18next'
 
 interface InteractivePodcastPlayerProps {
   episodeId: string
@@ -205,7 +205,7 @@ export function InteractivePodcastPlayer({
       <div className="flex items-center justify-between gap-3">
         {/* Speed selector */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">{t.podcasts.speed}</span>
+          <span className="text-sm text-muted-foreground">{t('podcasts.speed')}</span>
           <Select
             value={playbackRate.toString()}
             onValueChange={handlePlaybackRateChange}
@@ -235,7 +235,7 @@ export function InteractivePodcastPlayer({
               onClick={handleAskQuestion}
             >
               <Mic className="mr-1.5 h-3 w-3" />
-              {t.podcasts.askQuestion}
+              {t('podcasts.askQuestion')}
             </Button>
           )}
 
@@ -257,7 +257,7 @@ export function InteractivePodcastPlayer({
                 onClick={handleFinishQuestion}
               >
                 <Square className="mr-1 h-2.5 w-2.5 fill-current" />
-                {t.podcasts.done}
+                {t('podcasts.done')}
               </Button>
               <Button
                 variant="ghost"
@@ -273,7 +273,7 @@ export function InteractivePodcastPlayer({
           {isProcessing && (
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span className="text-xs">{t.podcasts.processingQuestion}</span>
+              <span className="text-xs">{t('podcasts.processingQuestion')}</span>
             </div>
           )}
 
@@ -282,10 +282,10 @@ export function InteractivePodcastPlayer({
             <>
               <Volume2 className="h-3.5 w-3.5 text-primary animate-pulse" />
               <span className="text-xs text-primary">
-                {t.podcasts.playingResponse}
+                {t('podcasts.playingResponse')}
               </span>
               <Button variant="ghost" className="h-7 px-2 text-xs" onClick={handleSkipResponse}>
-                {t.podcasts.skipResponse}
+                {t('podcasts.skipResponse')}
               </Button>
             </>
           )}
@@ -324,7 +324,7 @@ export function InteractivePodcastPlayer({
 
             {!lastResponse.has_audio && (
               <Button variant="outline" className="h-7 px-2 text-xs" onClick={handleSkipResponse}>
-                {t.podcasts.resumePodcast}
+                {t('podcasts.resumePodcast')}
               </Button>
             )}
           </CardContent>
