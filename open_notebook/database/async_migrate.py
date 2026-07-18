@@ -116,6 +116,15 @@ class AsyncMigrationManager:
         """Highest applied migration id (0 if none). For display/logging."""
         return await get_latest_version()
 
+    async def ping(self) -> None:
+        """Check whether SurrealDB is reachable for migration startup."""
+        async with db_connection() as connection:
+            await connection.query("RETURN true;")
+
+        # Also exercise the migration version path. get_current_version() already
+        # treats a missing migrations table as version 0 for fresh databases.
+        await self.get_current_version()
+
     async def get_pending(self) -> List[AsyncMigration]:
         applied = await get_applied_ids()
         return [m for m in self.migrations if m.id not in applied]

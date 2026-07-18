@@ -9,7 +9,7 @@ from __future__ import annotations
 import mimetypes
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response

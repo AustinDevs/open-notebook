@@ -22,7 +22,7 @@ from importlib import metadata
 from typing import Dict, Optional
 
 from loguru import logger
-from open_notebook_creator_sdk import BaseCreator, CreatorManifest, ENTRY_POINT_GROUP
+from open_notebook_creator_sdk import ENTRY_POINT_GROUP, BaseCreator, CreatorManifest
 from open_notebook_creator_sdk import __version__ as SDK_VERSION
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version

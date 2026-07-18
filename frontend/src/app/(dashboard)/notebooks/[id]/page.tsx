@@ -30,8 +30,8 @@ import {
 
 // Re-exported from the shared types module for backward compatibility; several
 // components historically import these from this route file.
-import type { ContextMode, ContextSelections } from '@/lib/types/notebook-context'
-export type { ContextMode, ContextSelections }
+import type { ContextMode, ContextSelections, NoteContextMode } from '@/lib/types/notebook-context'
+export type { ContextMode, ContextSelections, NoteContextMode }
 
 export default function NotebookPage() {
   const { t } = useTranslation()
@@ -93,13 +93,22 @@ export default function NotebookPage() {
     }
   }, [notes, noteContextDefault])
 
-  // Handler to update context selection
-  const handleContextModeChange = (itemId: string, mode: ContextMode, type: 'source' | 'note') => {
+  const handleSourceContextModeChange = (sourceId: string, mode: ContextMode) => {
     setContextSelections(prev => ({
       ...prev,
-      [type === 'source' ? 'sources' : 'notes']: {
-        ...(type === 'source' ? prev.sources : prev.notes),
-        [itemId]: mode
+      sources: {
+        ...prev.sources,
+        [sourceId]: mode
+      }
+    }))
+  }
+
+  const handleNoteContextModeChange = (noteId: string, mode: NoteContextMode) => {
+    setContextSelections(prev => ({
+      ...prev,
+      notes: {
+        ...prev.notes,
+        [noteId]: mode
       }
     }))
   }
@@ -187,7 +196,7 @@ export default function NotebookPage() {
                     notebookName={notebook?.name}
                     onRefresh={refetchSources}
                     contextSelections={contextSelections.sources}
-                    onContextModeChange={(sourceId, mode) => handleContextModeChange(sourceId, mode, 'source')}
+                    onContextModeChange={handleSourceContextModeChange}
                     onBulkContextModeChange={handleBulkSourceContext}
                     hasNextPage={hasNextPage}
                     isFetchingNextPage={isFetchingNextPage}
@@ -200,7 +209,7 @@ export default function NotebookPage() {
                     isLoading={notesLoading}
                     notebookId={notebookId}
                     contextSelections={contextSelections.notes}
-                    onContextModeChange={(noteId, mode) => handleContextModeChange(noteId, mode, 'note')}
+                    onContextModeChange={handleNoteContextModeChange}
                     onBulkContextModeChange={handleBulkNoteContext}
                   />
                 )}
@@ -236,7 +245,7 @@ export default function NotebookPage() {
                 notebookName={notebook?.name}
                 onRefresh={refetchSources}
                 contextSelections={contextSelections.sources}
-                onContextModeChange={(sourceId, mode) => handleContextModeChange(sourceId, mode, 'source')}
+                onContextModeChange={handleSourceContextModeChange}
                 onBulkContextModeChange={handleBulkSourceContext}
                 hasNextPage={hasNextPage}
                 isFetchingNextPage={isFetchingNextPage}
@@ -254,7 +263,7 @@ export default function NotebookPage() {
                 isLoading={notesLoading}
                 notebookId={notebookId}
                 contextSelections={contextSelections.notes}
-                onContextModeChange={(noteId, mode) => handleContextModeChange(noteId, mode, 'note')}
+                onContextModeChange={handleNoteContextModeChange}
                 onBulkContextModeChange={handleBulkNoteContext}
               />
             </div>

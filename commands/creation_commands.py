@@ -11,7 +11,6 @@ surreal-commands generates for the command input ("... is not fully defined").
 
 import shutil
 import time
-import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
