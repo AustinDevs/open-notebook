@@ -1,6 +1,6 @@
 'use client'
 
-import { EyeOff, Eye } from 'lucide-react'
+import { EyeOff, Lightbulb, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -14,12 +14,20 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 
 interface ContextToggleProps {
   mode: ContextMode
-  hasInsights?: boolean
+  hasInsights?: boolean // For sources - determines if 'insights' mode is available
   onChange: (mode: ContextMode) => void
   className?: string
 }
 
-export function ContextToggle({ mode, onChange, className }: ContextToggleProps) {
+export function ContextToggle<TMode extends ContextMode = ContextMode>({
+  mode,
+  hasInsights = false,
+  onChange,
+  className
+}: Omit<ContextToggleProps, 'mode' | 'onChange'> & {
+  mode: TMode
+  onChange: (mode: TMode) => void
+}) {
   const { t } = useTranslation()
 
   const MODE_CONFIG = {
@@ -46,13 +54,17 @@ export function ContextToggle({ mode, onChange, className }: ContextToggleProps)
   const Icon = config.icon
 
   // Determine available modes based on whether item has insights
-  const availableModes: ContextMode[] = hasInsights
+  const availableModes = (hasInsights
     ? ['off', 'insights', 'full']
-    : ['off', 'full']
+    : ['off', 'full']) as TMode[]
 
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onChange(isOn ? 'off' : 'on')
+    e.stopPropagation() // Prevent card click
+
+    // Cycle to next mode
+    const currentIndex = availableModes.indexOf(mode)
+    const nextIndex = (currentIndex + 1) % availableModes.length
+    onChange(availableModes[nextIndex])
   }
 
   return (
@@ -64,22 +76,16 @@ export function ContextToggle({ mode, onChange, className }: ContextToggleProps)
             size="sm"
             className={cn(
               'h-8 w-8 p-0 transition-colors',
-              isOn ? 'hover:bg-primary/10' : 'hover:bg-muted',
+              config.bgColor,
               className
             )}
             onClick={handleClick}
           >
-            {isOn ? (
-              <Eye className="h-4 w-4 text-primary" />
-            ) : (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
-            )}
+            <Icon className={cn('h-4 w-4', config.color)} />
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p className="text-xs">
-            {isOn ? t.common.contextModes.on : t.common.contextModes.off}
-          </p>
+          <p className="text-xs">{config.label}</p>
           <p className="text-[10px] text-muted-foreground mt-1">
             {t('common.contextModes.clickToCycle')}
           </p>

@@ -57,7 +57,14 @@ export interface SettingsResponse {
   default_content_processing_engine_url?: string
   default_embedding_option?: string
   auto_delete_files?: string
+  docling_ocr?: boolean
   youtube_preferred_languages?: string[]
+}
+
+export interface Capabilities {
+  docling_available: boolean
+  crawl4ai_available: boolean
+  crawl4ai_remote_configured: boolean
 }
 
 export interface CreateNotebookRequest {
@@ -216,7 +223,10 @@ export interface UpdateNotebookChatSessionRequest {
 export interface SendNotebookChatMessageRequest {
   session_id: string
   message: string
-  notebook_id?: string
+  context: {
+    sources: Array<Record<string, unknown>>
+    notes: Array<Record<string, unknown>>
+  }
   model_override?: string
 }
 
@@ -235,4 +245,11 @@ export interface BuildContextResponse {
   }
   token_count: number
   char_count: number
+}
+
+export interface RecentlyViewedResponse {
+  type: 'notebook' | 'source'
+  id: string
+  title: string
+  last_viewed_at: string
 }

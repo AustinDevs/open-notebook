@@ -1,9 +1,9 @@
 'use client'
 
 import { useMemo } from 'react'
-import { useNotebookChat } from '@/lib/hooks/useNotebookChat'
+import { useNotebookChat } from '@/lib/hooks/use-notebook-chat'
 import { useNotes } from '@/lib/hooks/use-notes'
-import { ChatPanel } from '@/components/source/ChatPanel'
+import { ChatPanel } from '@/components/sources/ChatPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertCircle } from 'lucide-react'
@@ -24,30 +24,46 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
   // Fetch notes for this notebook
   const { data: notes = [], isLoading: notesLoading } = useNotes(notebookId)
 
-  // Initialize notebook chat hook (no longer needs sources/notes/contextSelections)
-  const chat = useNotebookChat({ notebookId })
+  // Initialize notebook chat hook
+  const chat = useNotebookChat({
+    notebookId,
+    sources,
+    notes,
+    contextSelections
+  })
 
-  // Calculate context stats for indicator (simple on/off counts)
+  // Calculate context stats for indicator
   const contextStats = useMemo(() => {
-    let sourcesCount = 0
+    let sourcesInsights = 0
+    let sourcesFull = 0
     let notesCount = 0
 
+    // Count sources by mode
     sources.forEach(source => {
       const mode = contextSelections.sources[source.id]
-      if (mode === 'on') {
-        sourcesCount++
+      if (mode === 'insights') {
+        sourcesInsights++
+      } else if (mode === 'full') {
+        sourcesFull++
       }
     })
 
+    // Count notes that are included (not 'off')
     notes.forEach(note => {
       const mode = contextSelections.notes[note.id]
-      if (mode === 'on') {
+      if (mode === 'full') {
         notesCount++
       }
     })
 
-    return { sourcesCount, notesCount }
-  }, [sources, notes, contextSelections])
+    return {
+      sourcesInsights,
+      sourcesFull,
+      notesCount,
+      tokenCount: chat.tokenCount,
+      charCount: chat.charCount
+    }
+  }, [sources, notes, contextSelections, chat.tokenCount, chat.charCount])
 
   // Show loading state while sources/notes are being fetched
   if (sourcesLoading || notesLoading) {
