@@ -45,6 +45,10 @@ interface SchemaProp {
   default?: unknown
   anyOf?: { type?: string }[]
   enum?: (string | number)[]
+  // Optional help link (from a Pydantic field's json_schema_extra). Rendered as
+  // a "learn more" link beside the field, opening in a new tab.
+  'x-help-url'?: string
+  'x-help-label'?: string
 }
 
 function propType(p: SchemaProp): string {
@@ -245,6 +249,16 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
                       ))}
                     </SelectContent>
                   </Select>
+                  {prop['x-help-url'] && (
+                    <a
+                      href={prop['x-help-url']}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-muted-foreground underline"
+                    >
+                      {prop['x-help-label'] || 'Learn more'} ↗
+                    </a>
+                  )}
                 </div>
               )
             }
