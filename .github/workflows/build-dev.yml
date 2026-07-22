@@ -27,8 +27,10 @@ permissions:
   packages: write
 
 env:
-  # Fork note: push dev images to this fork's own GHCR namespace
-  GHCR_IMAGE: ghcr.io/notebooker-ai/open-notebook
+  # Fork note: dev images go to a dedicated package — the bare
+  # `open-notebook` package belongs to the -nb repo's deploy workflow,
+  # so this repo's token cannot (and should not) write it.
+  GHCR_IMAGE: ghcr.io/notebooker-ai/open-notebook-dev
   DOCKERHUB_IMAGE: lfnovo/open_notebook
 
 jobs:
