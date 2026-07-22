@@ -27,7 +27,8 @@ permissions:
   packages: write
 
 env:
-  GHCR_IMAGE: ghcr.io/lfnovo/open-notebook
+  # Fork note: push dev images to this fork's own GHCR namespace
+  GHCR_IMAGE: ghcr.io/notebooker-ai/open-notebook
   DOCKERHUB_IMAGE: lfnovo/open_notebook
 
 jobs:
