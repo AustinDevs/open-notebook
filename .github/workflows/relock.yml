@@ -1,0 +1,49 @@
+# Regenerate uv.lock on demand (workflow_dispatch), committing the result back
+# to the branch it ran on. Use the `upgrade` input to pass packages that should
+# be bumped past their locked git revisions (uv keeps existing pins otherwise).
+name: Relock
+
+on:
+  workflow_dispatch:
+    inputs:
+      upgrade:
+        description: "Space-separated packages to --upgrade-package (optional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  relock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: uv lock
+        run: |
+          ARGS=""
+          for p in ${{ inputs.upgrade }}; do ARGS="$ARGS --upgrade-package $p"; done
+          uv lock $ARGS
+          uv lock --check
+
+      - name: Commit lockfile if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          if git diff --cached --quiet; then
+            echo "uv.lock already up to date"
+          else
+            git commit -m "chore: regenerate uv.lock (relock workflow)"
+            git push
+          fi
