@@ -35,6 +35,7 @@ CREATOR_PACKAGES: Dict[str, str] = {
     "mindmaps": "mindmap_creator:MindmapCreator",
     "textbooks": "textbook_creator:TextbookCreator",
     "socratic": "socratic_creator:SocraticCreator",
+    "websites": "website_creator:WebsiteCreator",
     # "podcasts": "podcast_creator.on_adapter:PodcastCreator",  # pending stateless refactor
 }
 
