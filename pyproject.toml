@@ -54,6 +54,7 @@ dependencies = [
     "mindmap-creator",
     "textbook-creator",
     "socratic-creator",
+    "website-creator",
 ]
 
 [tool.uv.sources]
@@ -67,6 +68,7 @@ mindmap-creator = { git = "https://github.com/Notebooker-ai/mindmap-creator.git"
 #   uv pip install -e ../open-notebook-creator-sdk -e ../textbook-creator
 textbook-creator = { git = "https://github.com/Notebooker-ai/textbook-creator.git", branch = "main" }
 socratic-creator = { git = "https://github.com/Notebooker-ai/socratic-creator.git", branch = "main" }
+website-creator = { git = "https://github.com/Notebooker-ai/website-creator.git", branch = "main" }
 
 [tool.setuptools]
 package-dir = {"open_notebook" = "open_notebook"}
