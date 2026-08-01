@@ -55,6 +55,7 @@ dependencies = [
     "textbook-creator",
     "socratic-creator",
     "website-creator",
+    "itinerary-creator",
 ]
 
 [tool.uv.sources]
@@ -69,6 +70,9 @@ mindmap-creator = { git = "https://github.com/Notebooker-ai/mindmap-creator.git"
 textbook-creator = { git = "https://github.com/Notebooker-ai/textbook-creator.git", branch = "main" }
 socratic-creator = { git = "https://github.com/Notebooker-ai/socratic-creator.git", branch = "main" }
 website-creator = { git = "https://github.com/Notebooker-ai/website-creator.git", branch = "main" }
+# NOTE: itinerary-creator is currently a private repo; make it public (or add a
+# PAT step to relock.yml, as in open-notebook-nb) before running Relock here.
+itinerary-creator = { git = "https://github.com/Notebooker-ai/itinerary-creator.git", branch = "main" }
 
 [tool.setuptools]
 package-dir = {"open_notebook" = "open_notebook"}

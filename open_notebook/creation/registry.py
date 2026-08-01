@@ -36,6 +36,7 @@ CREATOR_PACKAGES: Dict[str, str] = {
     "textbooks": "textbook_creator:TextbookCreator",
     "socratic": "socratic_creator:SocraticCreator",
     "websites": "website_creator:WebsiteCreator",
+    "itineraries": "itinerary_creator:ItineraryCreator",
     # "podcasts": "podcast_creator.on_adapter:PodcastCreator",  # pending stateless refactor
 }
 
