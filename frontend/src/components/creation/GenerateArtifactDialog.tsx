@@ -286,9 +286,7 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
                       [key]:
                         type === 'integer'
                           ? parseInt(raw, 10)
-                          : parseFloat === undefined
-                            ? raw
-                            : type === 'number'
+                          : type === 'number'
                             ? parseFloat(raw)
                             : raw,
                     }))
