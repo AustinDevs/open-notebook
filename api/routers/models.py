@@ -158,7 +158,7 @@ def _check_openai_compatible_support(mode: str) -> bool:
     Check if OpenAI-compatible provider is available for a specific mode.
 
     Args:
-        mode: One of 'LLM', 'EMBEDDING', 'STT', 'TTS'
+        mode: One of 'LLM', 'EMBEDDING', 'STT', 'TTS', 'IMAGE'
 
     Returns:
         bool: True if either generic or mode-specific env var is set
@@ -207,7 +207,7 @@ async def create_model(model_data: ModelCreate):
     """Create a new model configuration."""
     try:
         # Validate model type
-        valid_types = ["language", "embedding", "text_to_speech", "speech_to_text"]
+        valid_types = ["language", "embedding", "text_to_speech", "speech_to_text", "image"]
         if model_data.type not in valid_types:
             raise HTTPException(
                 status_code=400,
@@ -316,6 +316,7 @@ async def get_default_models():
             large_context_model=defaults.large_context_model,  # type: ignore[attr-defined]
             default_text_to_speech_model=defaults.default_text_to_speech_model,  # type: ignore[attr-defined]
             default_speech_to_text_model=defaults.default_speech_to_text_model,  # type: ignore[attr-defined]
+            default_image_model=defaults.default_image_model,  # type: ignore[attr-defined]
             default_embedding_model=defaults.default_embedding_model,  # type: ignore[attr-defined]
             default_tools_model=defaults.default_tools_model,  # type: ignore[attr-defined]
         )
@@ -370,6 +371,7 @@ async def update_default_models(defaults_data: DefaultModelsResponse):
             large_context_model=defaults.large_context_model,  # type: ignore[attr-defined]
             default_text_to_speech_model=defaults.default_text_to_speech_model,  # type: ignore[attr-defined]
             default_speech_to_text_model=defaults.default_speech_to_text_model,  # type: ignore[attr-defined]
+            default_image_model=defaults.default_image_model,  # type: ignore[attr-defined]
             default_embedding_model=defaults.default_embedding_model,  # type: ignore[attr-defined]
             default_tools_model=defaults.default_tools_model,  # type: ignore[attr-defined]
         )
@@ -447,6 +449,7 @@ async def get_provider_availability():
             or _check_openai_compatible_support("EMBEDDING")
             or _check_openai_compatible_support("STT")
             or _check_openai_compatible_support("TTS")
+            or _check_openai_compatible_support("IMAGE")
         )
         provider_status["anthropic_compatible"] = (
             await _check_provider_has_credential("anthropic_compatible")
@@ -473,6 +476,7 @@ async def get_provider_availability():
                 "embedding": "EMBEDDING",
                 "speech_to_text": "STT",
                 "text_to_speech": "TTS",
+                "image": "IMAGE",
             }
 
             # Special handling for openai-compatible to check mode-specific availability
@@ -482,9 +486,12 @@ async def get_provider_availability():
                 esperanto_name = "openai-compatible"
                 has_db_cred = await _check_provider_has_credential("openai_compatible")
                 for model_type, mode in mode_mapping.items():
+                    esperanto_key = (
+                        "text_to_image" if model_type == "image" else model_type
+                    )
                     if (
-                        model_type in esperanto_available
-                        and esperanto_name in esperanto_available[model_type]
+                        esperanto_key in esperanto_available
+                        and esperanto_name in esperanto_available[esperanto_key]
                     ):
                         if has_db_cred or _check_openai_compatible_support(mode):
                             supported_types[provider].append(model_type)
@@ -492,9 +499,12 @@ async def get_provider_availability():
             elif provider == "azure":
                 has_db_cred = await _check_provider_has_credential("azure")
                 for model_type, mode in mode_mapping.items():
+                    esperanto_key = (
+                        "text_to_image" if model_type == "image" else model_type
+                    )
                     if (
-                        model_type in esperanto_available
-                        and provider in esperanto_available[model_type]
+                        esperanto_key in esperanto_available
+                        and provider in esperanto_available[esperanto_key]
                     ):
                         if has_db_cred or _check_azure_support(mode):
                             supported_types[provider].append(model_type)
@@ -507,8 +517,11 @@ async def get_provider_availability():
             else:
                 # Standard provider detection
                 for model_type, providers in esperanto_available.items():
+                    display_type = (
+                        "image" if model_type == "text_to_image" else model_type
+                    )
                     if provider in providers:
-                        supported_types[provider].append(model_type)
+                        supported_types[provider].append(display_type)
 
         return ProviderAvailabilityResponse(
             available=available_providers,
@@ -645,7 +658,7 @@ async def get_model_count(provider: str):
     Get count of registered models for a provider, grouped by type.
 
     Returns counts for each model type (language, embedding,
-    speech_to_text, text_to_speech) as well as total count.
+    speech_to_text, text_to_speech, image) as well as total count.
     """
     try:
         counts = await get_provider_model_count(provider)
@@ -781,6 +794,7 @@ async def auto_assign_defaults():
             "embedding": [],
             "text_to_speech": [],
             "speech_to_text": [],
+            "image": [],
         }
 
         for model in all_models:
