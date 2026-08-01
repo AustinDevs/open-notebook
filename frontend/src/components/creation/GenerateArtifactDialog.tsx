@@ -36,8 +36,8 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-type ModelKind = 'language' | 'embedding' | 'speech_to_text' | 'text_to_speech'
-const MODEL_KINDS: ModelKind[] = ['language', 'embedding', 'speech_to_text', 'text_to_speech']
+type ModelKind = 'language' | 'embedding' | 'speech_to_text' | 'text_to_speech' | 'image'
+const MODEL_KINDS: ModelKind[] = ['language', 'embedding', 'speech_to_text', 'text_to_speech', 'image']
 
 interface SchemaProp {
   type?: string
@@ -286,7 +286,9 @@ export function GenerateArtifactDialog({ manifest, notebookId, open, onOpenChang
                       [key]:
                         type === 'integer'
                           ? parseInt(raw, 10)
-                          : type === 'number'
+                          : parseFloat === undefined
+                            ? raw
+                            : type === 'number'
                             ? parseFloat(raw)
                             : raw,
                     }))

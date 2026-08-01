@@ -3,7 +3,7 @@
 
 export interface CreationModelRole {
   key: string
-  kind: 'language' | 'text_to_speech' | 'speech_to_text' | 'embedding' | string
+  kind: 'language' | 'text_to_speech' | 'speech_to_text' | 'embedding' | 'image' | string
   requires: string[]
   min_context_window?: number | null
   provider_allowlist?: string[] | null
