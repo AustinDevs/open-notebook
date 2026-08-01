@@ -141,6 +141,7 @@ class DefaultModels(RecordModel):
     large_context_model: Optional[str] = None
     default_text_to_speech_model: Optional[str] = None
     default_speech_to_text_model: Optional[str] = None
+    default_image_model: Optional[str] = None
     # default_vision_model: Optional[str]
     default_embedding_model: Optional[str] = None
     default_tools_model: Optional[str] = None
@@ -189,6 +190,7 @@ class ModelManager:
             "embedding",
             "speech_to_text",
             "text_to_speech",
+            "image",
         ]:
             raise ConfigurationError(f"Invalid model type: {model.type}")
 
@@ -281,6 +283,17 @@ class ModelManager:
                 provider=provider,
                 config=config,
             )
+        elif model.type == "image":
+            create_t2i = getattr(AIFactory, "create_text_to_image", None)
+            if create_t2i is None:
+                raise ConfigurationError(
+                    "The installed esperanto version does not support text_to_image models"
+                )
+            return create_t2i(
+                model_name=model.name,
+                provider=provider,
+                config=config,
+            )
         else:
             raise ConfigurationError(f"Invalid model type: {model.type}")
 
@@ -352,13 +365,15 @@ class ModelManager:
             model_id = defaults.default_text_to_speech_model
         elif model_type == "speech_to_text":
             model_id = defaults.default_speech_to_text_model
+        elif model_type == "image":
+            model_id = defaults.default_image_model
         elif model_type == "large_context":
             model_id = defaults.large_context_model or defaults.default_chat_model
 
         if not model_id:
             logger.warning(
                 f"No default model configured for type '{model_type}'. "
-                f"Please go to Settings → Models and set a default model."
+                f"Please go to Settings \u2192 Models and set a default model."
             )
             return None
 
@@ -368,7 +383,7 @@ class ModelManager:
             logger.error(
                 f"Failed to load default model for type '{model_type}': {e}. "
                 f"The configured model_id '{model_id}' may have been deleted or misconfigured. "
-                f"Please go to Settings → Models and reconfigure the default model."
+                f"Please go to Settings \u2192 Models and reconfigure the default model."
             )
             return None
 
