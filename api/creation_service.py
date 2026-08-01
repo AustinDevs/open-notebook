@@ -22,6 +22,7 @@ _DEFAULT_BY_KIND = {
     "text_to_speech": ("default_text_to_speech_model",),
     "speech_to_text": ("default_speech_to_text_model",),
     "embedding": ("default_embedding_model",),
+    "image": ("default_image_model",),
 }
 
 # Mirror provision_langchain_model: above this many tokens, language work runs on
