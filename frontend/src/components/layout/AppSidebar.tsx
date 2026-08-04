@@ -110,8 +110,20 @@ export function AppSidebar() {
   const { creators } = useCreators()
   const navigation = useMemo(() => {
     return getNavigation(t).map(section => {
-      const items: { name: string; href: string; icon: LucideIcon }[] =
-        section.items.map(i => ({ name: i.name, href: i.href, icon: i.icon as LucideIcon }))
+      // iconClass carries the design system's per-item accent hue; preserve it
+      // off the static nav. Creator items leave it undefined so they render in
+      // the default sidebar tint rather than borrowing an unrelated accent.
+      const items: {
+        name: string
+        href: string
+        icon: LucideIcon
+        iconClass?: string
+      }[] = section.items.map(i => ({
+        name: i.name,
+        href: i.href,
+        icon: i.icon as LucideIcon,
+        iconClass: i.iconClass,
+      }))
       if (section.title === t('navigation.create')) {
         for (const c of creators) {
           if (!c.available) continue
