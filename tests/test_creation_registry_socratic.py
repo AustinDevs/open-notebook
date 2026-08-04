@@ -19,5 +19,6 @@ def test_socratic_loads_with_matching_manifest():
     lc = _load_one("socratic", CREATOR_PACKAGES["socratic"])
     assert lc.available, f"socratic creator failed to load: {lc.error}"
     m = lc.manifest
+    assert m is not None
     assert m.key == "socratic"
     assert m.emits == ["socratic.v1"]

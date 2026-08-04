@@ -19,5 +19,6 @@ def test_websites_loads_with_matching_manifest():
     lc = _load_one("websites", CREATOR_PACKAGES["websites"])
     assert lc.available, f"websites creator failed to load: {lc.error}"
     m = lc.manifest
+    assert m is not None
     assert m.key == "websites"
     assert m.emits == ["website.v1"]
