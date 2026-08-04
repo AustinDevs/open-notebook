@@ -111,8 +111,10 @@ export function AppSidebar() {
   const navigation = useMemo(() => {
     return getNavigation(t).map(section => {
       // iconClass carries the design system's per-item accent hue; preserve it
-      // off the static nav. Creator items leave it undefined so they render in
-      // the default sidebar tint rather than borrowing an unrelated accent.
+      // off the static nav. Upstream's rule is that content-producing
+      // destinations are accented (sources/sage, notebooks/teal,
+      // podcasts/mauve) while utility pages are not, so creators — which
+      // produce content — get one too.
       const items: {
         name: string
         href: string
@@ -131,6 +133,11 @@ export function AppSidebar() {
             name: c.name,
             href: `/creation/${c.key}`,
             icon: CREATOR_ICONS[c.icon ?? ''] ?? Sparkles,
+            // One shared accent for the whole creator family: it reads as a
+            // group, and each creator's own lucide icon does the individual
+            // differentiating. Clay is unclaimed in the nav and stays legible
+            // against Podcasts' mauve in this same section.
+            iconClass: 'text-clay',
           })
         }
       }
