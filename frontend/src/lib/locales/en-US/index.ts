@@ -515,6 +515,13 @@ export const enUS = {
     processingQuestion: "Processing your question...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "Generate Podcast Episode",
     generateEpisodeDesc: "Select the content to include and configure the episode details before generating a new podcast episode.",
     content: "Content",

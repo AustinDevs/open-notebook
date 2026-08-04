@@ -517,6 +517,13 @@ export const ptBR = {
     processingQuestion: "Processando sua pergunta...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "Gerar Episódio de Podcast",
     generateEpisodeDesc: "Selecione o conteúdo a incluir e configure os detalhes do episódio antes de gerar um novo episódio de podcast.",
     content: "Conteúdo",

@@ -517,6 +517,13 @@ export const ruRU = {
     processingQuestion: "Обработка вашего вопроса...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "Сгенерировать эпизод подкаста",
     generateEpisodeDesc: "Выберите контент для включения и настройте параметры эпизода перед генерацией.",
     content: "Контент",

@@ -520,6 +520,13 @@ export const deDE = {
     processingQuestion: "Deine Frage wird verarbeitet...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "Podcast-Episode erzeugen",
     generateEpisodeDesc: "Wähle die Inhalte aus und konfiguriere die Episodendetails, bevor eine neue Podcast-Episode erzeugt wird.",
     content: "Inhalt",

@@ -517,6 +517,13 @@ export const zhCN = {
     processingQuestion: "正在处理您的问题...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "生成播客单集",
     generateEpisodeDesc: "在生成新的播客单集之前，选择要包含的内容并配置单集详情。",
     content: "内容",

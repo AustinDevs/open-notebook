@@ -517,6 +517,13 @@ export const itIT = {
     processingQuestion: "Elaborazione della tua domanda...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "Genera episodio podcast",
     generateEpisodeDesc: "Seleziona il contenuto da includere e configura i dettagli dell'episodio prima di generare un nuovo episodio podcast.",
     content: "Contenuto",

@@ -517,6 +517,13 @@ export const jaJP = {
     processingQuestion: "質問を処理中...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "ポッドキャストエピソードを生成",
     generateEpisodeDesc: "含めるコンテンツを選択し、新しいポッドキャストエピソードを生成する前にエピソードの詳細を設定してください。",
     content: "コンテンツ",

@@ -28,6 +28,13 @@ The podcast features the following speakers:
 {% endfor %}
 </speakers>
 
+CRITICAL SPEAKER NAME RULES:
+- You MUST use EXACTLY these speaker names with EXACT spelling and capitalization: {{ speaker_names|join(', ') }}
+- Do NOT modify, abbreviate, or rephrase speaker names in any way
+- Do NOT add any speakers beyond those listed above
+- Do NOT use variations like first name only, nicknames, or alternative spellings
+- If a speaker name is "Alice Smith", use "Alice Smith" exactly - not "Alice", not "Smith", not "alice smith"
+
 Next, examine the outline produced by our director:
 <outline>
 {{ outline }}
@@ -78,13 +85,24 @@ Follow these format requirements strictly:
 {
     "transcript": [
         {
-            "speaker": "[Actual Speaker Name]",
+            "speaker": "{{ speaker_names[0] }}",
             "dialogue": "[Speaker's dialogue based on their personality and expertise]"
         },
+{% if speaker_names|length > 1 %}
+        {
+            "speaker": "{{ speaker_names[1] }}",
+            "dialogue": "[Speaker's dialogue based on their personality and expertise]"
+        },
+{% endif %}
     ...
     ]
 }
 ```
+
+ALLOWED SPEAKER NAMES (use these EXACTLY):
+{% for name in speaker_names %}
+- "{{ name }}"
+{% endfor %}
 
 Formatting instructions:
 {{ format_instructions}}

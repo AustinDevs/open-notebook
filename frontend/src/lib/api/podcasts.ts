@@ -7,6 +7,8 @@ import {
   Language,
   PodcastGenerationRequest,
   PodcastGenerationResponse,
+  InteractivePodcastRequest,
+  InteractivePodcastResponse,
 } from '@/lib/types/podcasts'
 
 export type EpisodeProfileInput = Omit<EpisodeProfile, 'id'>
@@ -33,6 +35,21 @@ export async function resolvePodcastAssetUrl(path?: string | null): Promise<stri
 export const podcastsApi = {
   listEpisodes: async () => {
     const response = await apiClient.get<PodcastEpisode[]>('/podcasts/episodes')
+    return response.data
+  },
+
+  askQuestion: async (
+    episodeId: string,
+    request: {
+      audio_base64: string
+      current_time: number
+      total_duration: number
+    }
+  ) => {
+    const response = await apiClient.post<InteractivePodcastResponse>(
+      `/podcasts/episodes/${episodeId}/ask`,
+      request
+    )
     return response.data
   },
 

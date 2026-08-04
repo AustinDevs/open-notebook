@@ -517,6 +517,13 @@ export const esES = {
     processingQuestion: "Procesando tu pregunta...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "Generar episodio de podcast",
     generateEpisodeDesc: "Selecciona el contenido a incluir y configura los detalles del episodio antes de generar un nuevo episodio de podcast.",
     content: "Contenido",

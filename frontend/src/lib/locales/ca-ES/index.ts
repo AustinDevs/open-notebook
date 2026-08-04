@@ -517,6 +517,13 @@ export const caES = {
     processingQuestion: "S'està processant la teva pregunta...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "Genera un episodi de podcast",
     generateEpisodeDesc: "Selecciona el contingut a incloure i configura els detalls de l'episodi abans de generar-lo.",
     content: "Contingut",

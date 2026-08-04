@@ -517,6 +517,13 @@ export const bnIN = {
     processingQuestion: "আপনার প্রশ্ন প্রক্রিয়া করা হচ্ছে...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "পডকাস্ট এপিসোড তৈরি করুন",
     generateEpisodeDesc: "নতুন পডকাস্ট এপিসোড তৈরি করার আগে অন্তর্ভুক্ত করার জন্য কন্টেন্ট নির্বাচন করুন এবং এপিসোডের বিবরণ কনফিগার করুন।",
     content: "কন্টেন্ট",

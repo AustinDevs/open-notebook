@@ -517,6 +517,13 @@ export const trTR = {
     processingQuestion: "Sorunuz işleniyor...",
   },
   podcasts: {
+    speed: "Speed",
+    askQuestion: "Ask a question",
+    done: "Done",
+    processingQuestion: "Processing your question...",
+    playingResponse: "Playing response",
+    skipResponse: "Skip response",
+    resumePodcast: "Resume podcast",
     generateEpisode: "Podcast Bölümü Oluştur",
     generateEpisodeDesc: "Yeni bir podcast bölümü oluşturmadan önce dahil edilecek içeriği seçin ve bölüm ayrıntılarını yapılandırın.",
     content: "İçerik",
