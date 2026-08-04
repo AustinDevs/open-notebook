@@ -8,11 +8,16 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
+from loguru import logger
 from typing_extensions import TypedDict
 
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.config import LANGGRAPH_CHECKPOINT_FILE
-from open_notebook.domain.notebook import Notebook
+from open_notebook.domain.notebook import (
+    Notebook,
+    format_retrieval_results,
+    vector_search,
+)
 from open_notebook.exceptions import OpenNotebookError
 from open_notebook.utils import clean_thinking_content
 from open_notebook.utils.error_classifier import classify_error
@@ -22,9 +27,61 @@ from open_notebook.utils.text_utils import extract_text_content
 class ThreadState(TypedDict):
     messages: Annotated[list, add_messages]
     notebook: Optional[Notebook]
+    notebook_id: Optional[str]
     context: Optional[str]
     context_config: Optional[dict]
     model_override: Optional[str]
+
+
+def retrieve_context(state: ThreadState, config: RunnableConfig) -> dict:
+    """Retrieve relevant context via vector search before calling the model."""
+    notebook_id = state.get("notebook_id")
+    if not notebook_id:
+        return {}
+
+    # Get the latest human message as the search query
+    messages = state.get("messages", [])
+    query = ""
+    for msg in reversed(messages):
+        if hasattr(msg, "type") and msg.type == "human":
+            query = msg.content if hasattr(msg, "content") else str(msg)
+            break
+
+    if not query:
+        return {}
+
+    # Run async vector_search from sync context
+    def run_search():
+        new_loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(new_loop)
+            return new_loop.run_until_complete(
+                vector_search(query, 10, True, True)
+            )
+        finally:
+            new_loop.close()
+            asyncio.set_event_loop(None)
+
+    try:
+        try:
+            asyncio.get_running_loop()
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_search)
+                results = future.result()
+        except RuntimeError:
+            results = run_search()
+
+        formatted = format_retrieval_results(results)
+        logger.info(
+            f"Retrieved {len(results)} results for notebook chat "
+            f"(notebook_id={notebook_id})"
+        )
+        return {"context": formatted}
+    except Exception as e:
+        logger.warning(f"Vector search failed in chat retrieval: {e}")
+        return {}
 
 
 def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict:
@@ -92,7 +149,9 @@ conn = sqlite3.connect(
 memory = SqliteSaver(conn)
 
 agent_state = StateGraph(ThreadState)
+agent_state.add_node("retrieve", retrieve_context)
 agent_state.add_node("agent", call_model_with_messages)
-agent_state.add_edge(START, "agent")
+agent_state.add_edge(START, "retrieve")
+agent_state.add_edge("retrieve", "agent")
 agent_state.add_edge("agent", END)
 graph = agent_state.compile(checkpointer=memory)

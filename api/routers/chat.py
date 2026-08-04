@@ -66,8 +66,12 @@ class ChatSessionWithMessagesResponse(ChatSessionResponse):
 class ExecuteChatRequest(BaseModel):
     session_id: str = Field(..., description="Chat session ID")
     message: str = Field(..., description="User message content")
-    context: Dict[str, Any] = Field(
-        ..., description="Chat context with sources and notes"
+    context: Optional[Dict[str, Any]] = Field(
+        None, description="Chat context with sources and notes (legacy, optional)"
+    )
+    notebook_id: Optional[str] = Field(
+        None,
+        description="Notebook ID for RAG retrieval. Looked up from session if not provided.",
     )
     model_override: Optional[str] = Field(
         None, description="Optional model override for this message"
@@ -330,6 +334,17 @@ async def execute_chat(request: ExecuteChatRequest):
             chat_graph.get_state,
             config=RunnableConfig(configurable={"thread_id": full_session_id}),
         )
+
+        # Resolve notebook_id: use request value, or look up from session relationship
+        notebook_id = request.notebook_id
+        if not notebook_id:
+            notebook_query = await repo_query(
+                "SELECT out FROM refers_to WHERE in = $session_id",
+                {"session_id": ensure_record_id(full_session_id)},
+            )
+            if notebook_query:
+                nb_ref = notebook_query[0]["out"]
+                notebook_id = str(nb_ref) if nb_ref else None
 
         # Prepare state for execution
         state_values = current_state.values if current_state else {}

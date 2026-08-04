@@ -837,3 +837,34 @@ async def vector_search(
         logger.error(f"Error performing vector search: {str(e)}")
         logger.exception(e)
         raise DatabaseOperationError(e)
+
+
+def format_retrieval_results(results: List[Dict[str, Any]]) -> str:
+    """Format vector_search results into a context string with document IDs for citation.
+
+    Args:
+        results: List of dicts from vector_search, each with keys:
+            id, title, matches, parent_id, similarity
+
+    Returns:
+        Formatted context string suitable for LLM prompts.
+    """
+    if not results:
+        return ""
+
+    parts = []
+    for r in results:
+        doc_id = r.get("id", "unknown")
+        title = r.get("title", "Untitled")
+        similarity = r.get("similarity", 0)
+        matches = r.get("matches", [])
+
+        parts.append(f"### [{doc_id}] {title} (relevance: {similarity:.2f})")
+        for match in matches:
+            if isinstance(match, str):
+                parts.append(match)
+            elif isinstance(match, dict):
+                parts.append(match.get("content", str(match)))
+        parts.append("")  # blank line separator
+
+    return "\n".join(parts)
