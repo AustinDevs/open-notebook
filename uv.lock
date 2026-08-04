@@ -2266,8 +2266,8 @@ notebooks = [
 
 [[package]]
 name = "open-notebook-creator-sdk"
-version = "0.4.0"
-source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#8cdc5bab40b534cef3468e911fe5e16577e2d9a8" }
+version = "0.8.0"
+source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#e9deb615624519494a212c3f2ee580e81a25f936" }
 dependencies = [
     { name = "packaging" },
     { name = "pydantic" },
