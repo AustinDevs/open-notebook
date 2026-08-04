@@ -442,6 +442,7 @@ class TestUpdateDefaultModels:
         defaults.default_speech_to_text_model = None
         defaults.default_embedding_model = "model:embed"
         defaults.default_tools_model = "model:tools"
+        defaults.default_image_model = None
         defaults.update = AsyncMock()
         return defaults
 

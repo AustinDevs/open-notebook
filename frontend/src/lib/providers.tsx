@@ -1,4 +1,4 @@
-import { MessageSquare, Code, Mic, Volume2, Box } from 'lucide-react'
+import { MessageSquare, Code, Mic, Volume2, Box, Image as ImageIcon } from 'lucide-react'
 
 // Provider metadata (names, display names, modalities, docs links) comes
 // from the backend registry via GET /api/providers — see useProviders()
@@ -10,13 +10,14 @@ import { MessageSquare, Code, Mic, Volume2, Box } from 'lucide-react'
 // instead of breaking. Adding a provider must never require a frontend
 // edit.
 
-export type ModelType = 'language' | 'embedding' | 'text_to_speech' | 'speech_to_text'
+export type ModelType = 'language' | 'embedding' | 'text_to_speech' | 'speech_to_text' | 'image'
 
 export const MODEL_TYPES: ModelType[] = [
   'language',
   'embedding',
   'text_to_speech',
   'speech_to_text',
+  'image',
 ]
 
 const TYPE_ICONS: Record<ModelType, React.ReactNode> = {
@@ -24,6 +25,7 @@ const TYPE_ICONS: Record<ModelType, React.ReactNode> = {
   embedding: <Code className="h-3 w-3" />,
   text_to_speech: <Volume2 className="h-3 w-3" />,
   speech_to_text: <Mic className="h-3 w-3" />,
+  image: <ImageIcon className="h-3 w-3" />,
 }
 
 // Mandatory fallback for modality strings the frontend doesn't know yet.
@@ -34,6 +36,7 @@ const TYPE_COLORS: Record<ModelType, string> = {
   embedding: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   text_to_speech: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   speech_to_text: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  image: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
 }
 
 export const TYPE_COLOR_INACTIVE = 'bg-muted text-muted-foreground opacity-50'
@@ -45,6 +48,7 @@ const TYPE_LABELS: Record<ModelType, string> = {
   embedding: 'Embedding',
   text_to_speech: 'TTS',
   speech_to_text: 'STT',
+  image: 'Image',
 }
 
 export function getTypeIcon(type: string): React.ReactNode {

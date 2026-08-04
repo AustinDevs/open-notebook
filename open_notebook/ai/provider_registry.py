@@ -67,13 +67,16 @@ class ProviderSpec:
 
 _LANGUAGE_ONLY = ("language",)
 _ALL_MODALITIES = ("language", "embedding", "speech_to_text", "text_to_speech")
+# Image generation is only wired up for the OpenAI-shaped endpoints so far; the
+# other providers keep _ALL_MODALITIES until their image APIs are supported.
+_ALL_MODALITIES_WITH_IMAGE = _ALL_MODALITIES + ("image",)
 
 
 _PROVIDER_SPECS: Tuple[ProviderSpec, ...] = (
         ProviderSpec(
             name="openai",
             display_name="OpenAI",
-            modalities=_ALL_MODALITIES,
+            modalities=_ALL_MODALITIES_WITH_IMAGE,
             required_env=("OPENAI_API_KEY",),
             test_model="gpt-3.5-turbo",
             docs_url="https://platform.openai.com/api-keys",
@@ -267,7 +270,7 @@ _PROVIDER_SPECS: Tuple[ProviderSpec, ...] = (
         ProviderSpec(
             name="openai_compatible",
             display_name="OpenAI Compatible",
-            modalities=_ALL_MODALITIES,
+            modalities=_ALL_MODALITIES_WITH_IMAGE,
             required_any_env=("OPENAI_COMPATIBLE_BASE_URL", "OPENAI_COMPATIBLE_API_KEY"),
             test_model=None,  # Dynamic - uses first available model
             docs_url="https://github.com/lfnovo/open-notebook/blob/main/docs/5-CONFIGURATION/openai-compatible.md",

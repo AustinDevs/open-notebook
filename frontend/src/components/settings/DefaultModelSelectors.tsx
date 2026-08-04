@@ -151,6 +151,7 @@ export function DefaultModelSelectors({
     { key: 'default_embedding_model', label: t('models.embeddingModelLabel'), description: t('models.embeddingModelDesc'), modelType: 'embedding', required: true, id: `${generatedId}-embed` },
     { key: 'default_text_to_speech_model', label: t('models.ttsModelLabel'), description: t('models.ttsModelDesc'), modelType: 'text_to_speech', id: `${generatedId}-tts` },
     { key: 'default_speech_to_text_model', label: t('models.sttModelLabel'), description: t('models.sttModelDesc'), modelType: 'speech_to_text', id: `${generatedId}-stt` },
+    { key: 'default_image_model', label: t('models.imageModelLabel'), description: t('models.imageModelDesc'), modelType: 'image', id: `${generatedId}-image` },
   ]
 
   const advancedConfigs: DefaultConfig[] = [

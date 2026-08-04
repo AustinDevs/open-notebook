@@ -938,6 +938,8 @@ export const esES = {
     ttsModelDesc: "Usado para generación de podcasts",
     sttModelLabel: "Modelo de voz a texto",
     sttModelDesc: "Usado para transcripción de audio",
+    imageModelLabel: "Modelo de imagen",
+    imageModelDesc: "Usado para generación de imágenes",
     embeddingChangeTitle: "Cambio de modelo de embedding",
     embeddingChangeConfirm: "Estás a punto de cambiar tu modelo de embedding de {{from}} a {{to}}.",
     rebuildRequired: "Importante: Reconstrucción requerida",

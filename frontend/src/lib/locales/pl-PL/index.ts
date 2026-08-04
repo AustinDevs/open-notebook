@@ -937,6 +937,8 @@ export const plPL = {
     ttsModelDesc: "Używany do generowania podcastów",
     sttModelLabel: "Model rozpoznawania mowy",
     sttModelDesc: "Używany do transkrypcji audio",
+    imageModelLabel: "Model obrazu",
+    imageModelDesc: "Używany do generowania obrazów",
     embeddingChangeTitle: "Zmiana modelu osadzania",
     embeddingChangeConfirm: "Zamierzasz zmienić model osadzania z {{from}} na {{to}}.",
     rebuildRequired: "Ważne: wymagana przebudowa",

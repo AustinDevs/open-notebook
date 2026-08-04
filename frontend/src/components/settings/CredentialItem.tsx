@@ -70,6 +70,7 @@ export function CredentialItem({
       'Embedding': defaults.default_embedding_model,
       'TTS': defaults.default_text_to_speech_model,
       'STT': defaults.default_speech_to_text_model,
+      'Image': defaults.default_image_model,
     }
     for (const [slot, modelId] of Object.entries(slotMap)) {
       if (modelId) defaultSlots[modelId] = slot
