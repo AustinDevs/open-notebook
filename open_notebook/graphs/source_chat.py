@@ -20,6 +20,7 @@ from open_notebook.domain.notebook import (
 )
 from open_notebook.exceptions import OpenNotebookError
 from open_notebook.utils import clean_thinking_content
+from open_notebook.utils.context_builder import format_source_context
 from open_notebook.utils.error_classifier import classify_error
 from open_notebook.utils.text_utils import extract_text_content
 
@@ -30,6 +31,18 @@ class SourceChatState(TypedDict):
     context: Optional[str]
     model_override: Optional[str]
     context_indicators: Optional[Dict[str, list[str]]]
+
+
+def _source_content_is_available(
+    source_info: Dict,
+    context_data: Dict,
+) -> bool:
+    """Return whether source text, including a truncated prefix, is available."""
+    status = context_data.get("metadata", {}).get("source_text_status")
+    if status is not None:
+        return status in {"available", "truncated"}
+    full_text = source_info.get("full_text")
+    return isinstance(full_text, str) and bool(full_text.strip())
 
 
 def call_model_with_source_context(
@@ -192,6 +205,18 @@ def _call_model_with_source_context_inner(
         "context": formatted_context,
         "context_indicators": context_indicators,
     }
+
+
+def _format_source_context(context_data: Dict) -> str:
+    """Format context through the builder's shared budgeted renderer.
+
+    Retained from upstream #1226. This graph now sources its context from
+    vector_search (see call_model_with_source_context) rather than
+    build_source_context, so nothing here calls this; it stays as the
+    documented entry point for the builder's renderer and keeps this module
+    aligned with upstream to limit future merge conflicts.
+    """
+    return format_source_context(context_data)
 
 
 # Create SQLite checkpointer
