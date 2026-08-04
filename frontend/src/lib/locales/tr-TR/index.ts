@@ -900,6 +900,8 @@ export const trTR = {
     ttsModelDesc: "Podcast oluşturma için kullanılır",
     sttModelLabel: "Sesten Metne Modeli",
     sttModelDesc: "Ses transkripsiyonu için kullanılır",
+    visionModelLabel: "Görü modeli",
+    visionModelDesc: "Görseller, PDF'ler ve videolar için görsel analiz",
     embeddingChangeTitle: "Gömme Modeli Değişikliği",
     embeddingChangeConfirm: "Gömme modelinizi {{from}}'dan {{to}}'ya değiştirmek üzeresiniz.",
     rebuildRequired: "Önemli: Yeniden Oluşturma Gerekli",

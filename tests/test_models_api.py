@@ -440,6 +440,7 @@ class TestUpdateDefaultModels:
         defaults.large_context_model = None
         defaults.default_text_to_speech_model = "model:tts"
         defaults.default_speech_to_text_model = None
+        defaults.default_vision_model = None
         defaults.default_embedding_model = "model:embed"
         defaults.default_tools_model = "model:tools"
         defaults.update = AsyncMock()

@@ -111,17 +111,41 @@ async def content_process(state: SourceState) -> dict:
     try:
         model_manager = ModelManager()
         defaults = await model_manager.get_defaults()
+
+        # Speech-to-text model config (for audio/video transcription)
         if defaults.default_speech_to_text_model:
             stt_model = await Model.get(defaults.default_speech_to_text_model)
             if stt_model:
                 config_kwargs["audio_provider"] = stt_model.provider
                 config_kwargs["audio_model"] = stt_model.name
+                if (
+                    stt_model.credential
+                    and "audio_config" in ContentCoreConfig.model_fields
+                ):
+                    cred = await stt_model.get_credential_obj()
+                    if cred:
+                        config_kwargs["audio_config"] = cred.to_esperanto_config()
                 logger.debug(
                     f"Using speech-to-text model: {stt_model.provider}/{stt_model.name}"
                 )
+
+        # Vision model config (for image, video frame, and PDF page analysis)
+        vision_model_id = defaults.default_vision_model or defaults.default_chat_model
+        if vision_model_id:
+            vision_db_model = await Model.get(vision_model_id)
+            if vision_db_model:
+                content_state["vision_provider"] = vision_db_model.provider
+                content_state["vision_model"] = vision_db_model.name
+                if vision_db_model.credential:
+                    cred = await vision_db_model.get_credential_obj()
+                    if cred:
+                        content_state["vision_config"] = cred.to_esperanto_config()
+                logger.debug(
+                    f"Using vision model: {vision_db_model.provider}/{vision_db_model.name}"
+                )
     except Exception as e:
-        logger.warning(f"Failed to retrieve speech-to-text model configuration: {e}")
-        # Continue without custom audio model (content-core will use its default)
+        logger.warning(f"Failed to retrieve model configuration: {e}")
+        # Continue without custom models (content-core will use its defaults)
 
     config = ContentCoreConfig(**config_kwargs) if config_kwargs else None
 
@@ -163,6 +187,39 @@ async def content_process(state: SourceState) -> dict:
             "Could not extract content from this source. "
             "The URL or file may be unreachable, invalid, or in an unsupported format."
         )
+
+    # For PDFs processed by the vision pipeline, also pull literal text via
+    # pdfplumber (content-core's existing extractor) and use that as the
+    # primary `content`. Vision sampling skips pages by design — fine for
+    # figure/layout understanding but bad for RAG/chat, since embeddings
+    # built from a sampled summary can't cite content from pages that
+    # were never read. We move the vision output to metadata.visual_analysis
+    # so save_source can attach it as a separate insight.
+    pdf_path = (
+        content_state.get("file_path") if isinstance(content_state, dict) else None
+    )
+    if (
+        processed.identified_type == "application/pdf"
+        and config_kwargs.get("vision_provider")
+        and pdf_path
+        and os.path.exists(pdf_path)
+    ):
+        try:
+            from content_core.processors.document.pdf import _extract_text_from_pdf
+
+            raw_text = ((await _extract_text_from_pdf(pdf_path)) or "").strip()
+            if len(raw_text) >= 200:
+                processed.metadata = dict(processed.metadata or {})
+                processed.metadata["visual_analysis"] = processed.content
+                processed.content = raw_text
+                logger.info(
+                    f"PDF: using {len(raw_text)} chars of pdfplumber text as primary "
+                    "content; vision output preserved as visual_analysis insight"
+                )
+        except Exception as e:
+            logger.warning(
+                f"Raw-text extraction fallback failed; keeping vision-only content: {e}"
+            )
 
     if not processed.content or not processed.content.strip():
         url = content_state.get("url") or ""
@@ -214,6 +271,20 @@ async def save_source(state: SourceState) -> dict:
         source.title = extraction.title
 
     await source.save()
+
+    # When extract_content ran both raw text (for full_text) AND vision-based
+    # visual analysis as enrichment (figures/tables/layout), persist the
+    # visual analysis as a separate insight. Keeps full_text literal so RAG
+    # and chat can cite real document passages, while the visual summary
+    # stays accessible to the user via the Insights tab.
+    visual_analysis = (extraction.metadata or {}).get("visual_analysis")
+    if visual_analysis:
+        try:
+            await source.add_insight("Visual analysis", visual_analysis)
+        except Exception as e:
+            logger.warning(
+                f"Failed to attach visual analysis insight for source {source.id}: {e}"
+            )
 
     # NOTE: Notebook associations are created by the API immediately for UI responsiveness
     # No need to create them here to avoid duplicate edges

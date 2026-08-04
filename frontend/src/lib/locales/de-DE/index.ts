@@ -903,6 +903,8 @@ export const deDE = {
     ttsModelDesc: "Wird für die Podcast-Erstellung verwendet",
     sttModelLabel: "Speech-to-Text-Modell",
     sttModelDesc: "Wird für Audiotranskription verwendet",
+    visionModelLabel: "Vision-Modell",
+    visionModelDesc: "Visuelle Analyse für Bilder, PDFs und Videos",
     embeddingChangeTitle: "Embedding-Modell ändern",
     embeddingChangeConfirm: "Du bist dabei, dein Embedding-Modell von {{from}} auf {{to}} zu ändern.",
     rebuildRequired: "Wichtig: Neuaufbau erforderlich",
