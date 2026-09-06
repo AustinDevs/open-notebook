@@ -1,0 +1,176 @@
+"""Context-length rejections must fail immediately instead of being retried.
+
+Regression coverage for #1231. A provider's context-length 400 is deterministic:
+the same oversized payload is resent on every attempt, so retrying can never
+succeed. Before the fix it surfaced as `ExternalServiceError` -- the same class
+used for provider 5xx -- so the retry blocklist could not tell the two apart and
+retried both, re-running the whole source pipeline for ~25 minutes.
+
+Two properties are pinned here:
+
+1. `classify_error()` maps a context-length message to `ContextLengthExceededError`
+   (guards the rule and its ordering in `_CLASSIFICATION_RULES`).
+2. The registered commands' retry configs stop on it after a single attempt,
+   while a transient error still consumes the full retry budget (guards
+   `stop_on`, and guards against over-correcting into "never retry anything").
+"""
+
+import pytest
+from surreal_commands.core.registry import registry
+from surreal_commands.core.retry import build_async_retry_instance
+
+import commands  # noqa: F401  -- import registers the @command decorators
+from open_notebook.exceptions import (
+    AuthenticationError,
+    ContextLengthExceededError,
+    ExternalServiceError,
+    RateLimitError,
+)
+from open_notebook.utils.error_classifier import classify_error
+
+# The message OpenRouter returned in #1231, as the OpenAI SDK surfaces it.
+OPENROUTER_CONTEXT_LENGTH_400 = (
+    "Error code: 400 - {'error': {'message': \"This endpoint's maximum context "
+    "length is 262144 tokens. However, you requested about 403309 tokens "
+    "(395117 of text input, 8192 in the output).\", 'code': 400}}"
+)
+
+# Commands whose retry config must treat context-length errors as permanent.
+RETRY_COMMANDS = [
+    "open_notebook.process_source",
+    "open_notebook.run_transformation",
+]
+
+
+def _retry_config(command_id: str):
+    """The live retry config the worker would actually use for this command."""
+    item = registry.get_command_by_id(command_id)
+    assert item is not None, f"{command_id} is not registered"
+    assert item.retry_config is not None, f"{command_id} has no retry config"
+    return item.retry_config
+
+
+def _instant(config):
+    """Same config, but without the real backoff, so tests don't sleep."""
+    return config.model_copy(
+        update={"wait_strategy": "fixed", "wait_time": 0, "wait_min": 0, "wait_max": 0}
+    )
+
+
+async def _count_attempts(config, exc: Exception) -> int:
+    """Drive the real tenacity instance and report how many attempts it made."""
+    attempts = 0
+    retrying = build_async_retry_instance(_instant(config))
+    with pytest.raises(type(exc)):
+        async for attempt in retrying:
+            with attempt:
+                attempts += 1
+                raise exc
+    return attempts
+
+
+class TestClassification:
+    def test_openrouter_400_is_context_length_exceeded(self):
+        exc_class, message = classify_error(Exception(OPENROUTER_CONTEXT_LENGTH_400))
+
+        assert exc_class is ContextLengthExceededError
+        assert message  # user-facing text, not empty
+
+    def test_still_an_external_service_error(self):
+        """Subclassing is load-bearing: it keeps the existing 502 handler."""
+        assert issubclass(ContextLengthExceededError, ExternalServiceError)
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            # Anthropic. The token count contains "429" — a substring match on
+            # status codes would turn this into a rate limit (and retry it).
+            "prompt is too long: 142900 tokens > 200000 maximum",
+            # Google
+            "400 The input token count (250012) exceeds the maximum number of tokens allowed (131072).",
+            # OpenAI
+            "This model's maximum context length is 8192 tokens. However, your messages resulted in 10500 tokens.",
+            # Bedrock
+            "ValidationException: Input is too long for requested model.",
+            # Generic "exceeds the maximum", qualified by tokens
+            "Prompt of 9000 tokens exceeds the maximum of 8192.",
+            "Request exceeds the maximum allowed tokens for this model.",
+        ],
+    )
+    def test_provider_wordings_are_context_length(self, message):
+        exc_class, _ = classify_error(Exception(message))
+
+        assert exc_class is ContextLengthExceededError
+
+    @pytest.mark.parametrize(
+        "message, expected",
+        [
+            ("Rate limit exceeded. Please wait a moment.", RateLimitError),
+            ("Error code: 429 - too many requests", RateLimitError),
+            # Token-rate throttles mention tokens but are transient, not a
+            # context window: they must stay retryable and must not chunk.
+            ("Too many tokens per minute for this model, slow down.", RateLimitError),
+            ("Request too large for model on tokens per min (TPM): Limit 6000", RateLimitError),
+            ("Error code: 401 - invalid api key", AuthenticationError),
+            ("Error code: 503 - service unavailable", ExternalServiceError),
+        ],
+    )
+    def test_status_codes_still_match_as_standalone_numbers(self, message, expected):
+        exc_class, _ = classify_error(Exception(message))
+
+        assert exc_class is expected
+
+    def test_bare_exceeds_the_maximum_is_not_context_length(self):
+        """Upload/request-size wording shares the phrase but isn't a token window."""
+        exc_class, _ = classify_error(
+            Exception("File exceeds the maximum upload size of 100 MB")
+        )
+
+        assert not issubclass(exc_class, ContextLengthExceededError)
+
+    def test_status_code_inside_a_larger_number_does_not_match(self):
+        """"4290 items" must not read as HTTP 429; unknown wording falls through
+        to the generic external error."""
+        exc_class, _ = classify_error(Exception("Processed 4290 items, then failed"))
+
+        assert exc_class is ExternalServiceError
+        assert not issubclass(exc_class, ContextLengthExceededError)
+
+    def test_provider_5xx_stays_retryable(self):
+        """The regression guard -- 5xx must NOT be swept up as permanent."""
+        exc_class, _ = classify_error(
+            Exception("Error code: 503 - service unavailable, provider overloaded")
+        )
+
+        assert exc_class is ExternalServiceError
+        assert not issubclass(exc_class, ContextLengthExceededError)
+
+
+@pytest.mark.parametrize("command_id", RETRY_COMMANDS)
+class TestRetryBehaviour:
+    def test_stop_on_lists_context_length(self, command_id):
+        assert ContextLengthExceededError in _retry_config(command_id).stop_on
+
+    @pytest.mark.asyncio
+    async def test_context_length_is_attempted_once(self, command_id):
+        config = _retry_config(command_id)
+
+        attempts = await _count_attempts(
+            config, ContextLengthExceededError("Content too large")
+        )
+
+        assert attempts == 1, (
+            f"{command_id} retried a deterministic context-length failure "
+            f"{attempts} times; it must fail after the first attempt (#1231)"
+        )
+
+    @pytest.mark.asyncio
+    async def test_transient_error_still_uses_full_budget(self, command_id):
+        """Proves the fix narrows retries rather than disabling them."""
+        config = _retry_config(command_id)
+
+        attempts = await _count_attempts(
+            config, RuntimeError("Failed to commit transaction due to a conflict")
+        )
+
+        assert attempts == config.max_attempts
