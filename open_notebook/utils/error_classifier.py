@@ -19,17 +19,30 @@ from open_notebook.exceptions import (
     RateLimitError,
 )
 
-# Classification rules: (keywords, exception_class, user_message or None to pass through)
-_CLASSIFICATION_RULES: list[tuple[list[str], type[OpenNotebookError], str | None]] = [
+# Classification rules: (keywords, exception_class, user_message or None to pass through).
+# A keyword is a lowercase substring, an HTTP status code (matched as a standalone
+# number) or a compiled regex for wordings a substring can't pin down.
+_Keyword = str | re.Pattern[str]
+_CLASSIFICATION_RULES: list[tuple[list[_Keyword], type[OpenNotebookError], str | None]] = [
     # Authentication errors
     (
         ["authentication", "unauthorized", "invalid api key", "invalid_api_key", "401"],
         AuthenticationError,
         "Authentication failed. Please check your API key in Settings -> Credentials.",
     ),
-    # Rate limit errors
+    # Rate limit errors. Token-rate throttles ("tokens per minute") must be
+    # caught here, before the context-length rule below sees "tokens".
     (
-        ["rate limit", "rate_limit", "429", "too many requests", "quota exceeded"],
+        [
+            "rate limit",
+            "rate_limit",
+            "429",
+            "too many requests",
+            "quota exceeded",
+            "tokens per minute",
+            "tokens per min",
+            "(tpm)",
+        ],
         RateLimitError,
         "Rate limit exceeded. Please wait a moment and try again.",
     ),
@@ -68,8 +81,12 @@ _CLASSIFICATION_RULES: list[tuple[list[str], type[OpenNotebookError], str | None
             "max_tokens",
             "too many tokens",
             "input too long",
+            "input is too long",  # Bedrock: "Input is too long for requested model"
             "prompt is too long",
             "input token count",
+            # "exceeds the maximum" only when tokens are what's being counted —
+            # the bare phrase also describes upload sizes and request counts.
+            re.compile(r"tokens?\b.{0,40}\bexceeds? the maximum|exceeds? the maximum\b.{0,40}\btokens?"),
         ],
         ContextLengthExceededError,
         "Content too large for the selected model. Try using a smaller selection or a model with a larger context window.",
@@ -116,15 +133,17 @@ def classify_error(exception: BaseException) -> tuple[type[OpenNotebookError], s
     return ExternalServiceError, f"AI service error: {_truncate(str(exception))}"
 
 
-def _keyword_matches(keyword: str, text: str) -> bool:
+def _keyword_matches(keyword: _Keyword, text: str) -> bool:
     """Substring match, except HTTP status codes ("401", "429", "500", ...)
-    must appear as a standalone number.
+    must appear as a standalone number, and compiled patterns are searched.
 
     Provider messages carry token counts ("142900 tokens > 200000 maximum"),
     and a plain substring check would read "429" out of that count and
     classify a context-length rejection as a rate limit — which then gets
     retried by the worker instead of triggering chunking (cf. #1303 for the
     same bug in the connection test)."""
+    if isinstance(keyword, re.Pattern):
+        return keyword.search(text) is not None
     if keyword.isdigit():
         return re.search(rf"(?<!\d){keyword}(?!\d)", text) is not None
     return keyword in text
